@@ -1,0 +1,11 @@
+@LIT_SITE_CFG_IN_HEADER@
+
+# Absolute paths discovered by CMake are baked in here, in the BUILD dir.
+config.llvm_tools_dir = lit_config.substitute("@LLVM_TOOLS_DIR@")
+config.example_obj_root = "@CMAKE_CURRENT_BINARY_DIR@"
+
+import lit.llvm
+lit.llvm.initialize(lit_config, config)
+
+# Hand off to the real, hand-written config that lives in the source tree.
+lit_config.load_config(config, "@CMAKE_CURRENT_SOURCE_DIR@/test/lit.cfg.py")
