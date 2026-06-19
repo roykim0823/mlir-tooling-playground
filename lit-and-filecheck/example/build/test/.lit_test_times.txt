@@ -1,4 +1,0 @@
-1.478434e-02 canonicalize.mlir
-1.139331e-02 cse.mlir
-1.567078e-02 invalid.mlir
-1.464939e-02 double_negate.mlir

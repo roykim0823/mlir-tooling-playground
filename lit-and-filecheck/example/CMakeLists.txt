@@ -6,16 +6,29 @@
 # for how you would swap in your own `my-opt` in a real project.
 
 cmake_minimum_required(VERSION 3.20)
-project(lit_filecheck_example NONE)
+# C/CXX are enabled (not NONE) because AddLLVM/AddMLIR run compiler/linker
+# feature checks at include() time; with no language enabled those checks error.
+project(lit_filecheck_example C CXX)
 
-# find_package(MLIR) also pulls in LLVM and sets MLIR_CMAKE_DIR / LLVM_CMAKE_DIR.
+# 1. Find the packages first. find_package(MLIR) transitively pulls in LLVM and
+#    sets MLIR_CMAKE_DIR / LLVM_CMAKE_DIR; we also find LLVM explicitly so this
+#    works against an *installed* LLVM/MLIR (e.g. Homebrew's llvm@20), not just a
+#    from-source build tree.
 find_package(MLIR REQUIRED CONFIG)
+find_package(LLVM REQUIRED CONFIG)
 
+# 2. Put the MLIR/LLVM CMake module dirs on the search path so include() below
+#    can find AddLLVM/AddMLIR/TableGen.
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 
-# Brings in configure_lit_site_cfg() and add_lit_testsuite().
+# 3. Bring in the LLVM/MLIR CMake helpers. AddLLVM provides configure_lit_site_cfg()
+#    and add_lit_testsuite() (all this example needs). AddMLIR/TableGen are included
+#    too so this file is a drop-in template for a project that also runs
+#    mlir_tablegen() on its own .td files.
 include(AddLLVM)
+include(AddMLIR)
+include(TableGen)
 
 # --- This is the standard two-file lit wiring -----------------------------
 # 1. The generated site config (build dir) bakes in absolute paths, then

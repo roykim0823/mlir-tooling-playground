@@ -21,7 +21,7 @@ example/
 ## Quick start — just run it
 
 ```bash
-cd tutorials/lit-and-filecheck/example
+cd lit-and-filecheck/example
 ./run.sh
 ```
 
@@ -40,14 +40,20 @@ Total Discovered Tests: 3
 
 ### Using a different LLVM/MLIR
 
-`run.sh` defaults to the LLVM build bundled in this repo
-(`../../../externals/llvm-project/build`). Point it anywhere else with:
+`run.sh` finds MLIR automatically, in this order: an explicit `MLIR_DIR`, a
+from-source build at `../../../externals/llvm-project/build`, then whatever
+`llvm-config` on your `PATH` points at (e.g. Homebrew's `llvm@20`). Override it
+with:
 
 ```bash
 MLIR_DIR=/path/to/your/llvm-build/lib/cmake/mlir ./run.sh
+# Homebrew: MLIR_DIR=$(brew --prefix llvm@20)/lib/cmake/mlir ./run.sh
 ```
 
-That is the only external dependency — there is nothing else repo-specific here.
+**`lit` runner.** The `check` target needs `lit`. A from-source LLVM build ships
+`llvm-lit`, but an *installed* LLVM (Homebrew included) does not. `run.sh` falls
+back to the `lit` PyPI package, bootstrapping it into a private `.lit-venv/` on
+first run. Set `LLVM_EXTERNAL_LIT=/path/to/lit` to use your own.
 
 ## How it works (the standard CMake + lit wiring)
 
