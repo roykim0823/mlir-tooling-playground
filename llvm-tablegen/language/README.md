@@ -8,9 +8,11 @@ This tutorial walks you through LLVM's **TableGen** language from the ground up,
 
 ## Table of Contents
 
-All lesson files live flat in [`solution/`](solution), numbered `01`–`16` in
-reading order. The headings below group them into four themes by what each
-concept is *for* (see [Directory layout](#directory-layout)).
+The headings below group them into four themes by what each
+concept is *for*. The [Directory layout](#directory-layout) table at the end
+links the worked solution file behind each lesson (each one also contains the
+answers to that lesson's "Try it yourself" exercises) — try the exercises first,
+then check yourself against it.
 
 - 0 — [Prerequisites & Setup](#lesson-0--prerequisites--setup)
 
@@ -73,14 +75,12 @@ That's it — every lesson uses this command unless noted otherwise.
 
 ## Lesson 1 — Your First Record
 
-*Source: `solution/01_first.td`*
-
 ### Concepts
 - A **record** is a named bag of typed fields, defined with `def`.
 - Fields have a **type** and an optional **initial value**.
 - An uninitialized value is written `?`.
 
-### Code — `solution/01_first.td`
+### Code
 ```tablegen
 def Apple {
   string Color = "red";
@@ -118,14 +118,12 @@ def Apple {
 
 ## Lesson 2 — Classes and Inheritance
 
-*Source: `solution/02_class.td`*
-
 ### Concepts
 - A **class** (`class`) is an *abstract* record — a template that other records can inherit from.
 - A `def D : C` says "record `D` inherits the fields of class `C`."
 - Inherited fields can be **overridden** in the body of the derived record using `let`.
 
-### Code — `solution/02_class.td`
+### Code
 ```tablegen
 class Fruit {
   string Color  = "unknown";
@@ -177,8 +175,6 @@ If two parent classes define the **same field**, the *last* parent's value wins 
 
 ## Lesson 3 — Types
 
-*Source: `solution/03_types.td`*
-
 TableGen's built-in types:
 
 | Type | Meaning |
@@ -192,7 +188,7 @@ TableGen's built-in types:
 | `dag` | A directed-acyclic-graph node (see Lesson 11). |
 | `ClassName` | The value must be a record that inherits from `ClassName`. |
 
-### Code — `solution/03_types.td`
+### Code
 ```tablegen
 class Anything;
 def  X : Anything;
@@ -236,11 +232,9 @@ def Demo {
 
 ## Lesson 4 — Template Arguments
 
-*Source: `solution/04_template.td`*
-
 A class can take **template arguments** in angle brackets `< ... >`. They're like function parameters — they let one class generate many records.
 
-### Code — `solution/04_template.td`
+### Code
 ```tablegen
 class Register<string n, int num> {
   string Name   = n;
@@ -314,8 +308,6 @@ def Beta  : Tagged;     // MyName = "Beta"
 
 ## Lesson 5 — The `let` Statement
 
-*Source: `solution/05_let.td`, `solution/05_exercise.td`*
-
 `let` overrides field values. It comes in three flavors.
 
 ### Flavor A — inside a record body
@@ -382,8 +374,6 @@ def ADD : Inst {
 ---
 
 ## Lesson 6 — Values, Expressions, and Bang Operators
-
-*Source: `solution/06_bang_op.td`*
 
 A **bang operator** is a built-in function whose name starts with `!`. They turn TableGen from a glorified config language into a real metaprogramming tool.
 
@@ -515,8 +505,6 @@ def Checks {
 
 ## Lesson 7 — The Paste Operator `#`
 
-*Source: `solution/07_paste.td`*
-
 `#` is the **only infix operator** in TableGen. It glues things together — strings, lists, or *identifier-like name fragments*.
 
 ### Rule 1 — In a `def`/`defm` *name*, `#` builds a string
@@ -564,14 +552,12 @@ def L { list<int> X = [1,2,3] # [4,5]; }   // [1,2,3,4,5]
 
 ## Lesson 8 — `multiclass` and `defm`
 
-*Source: `solution/08_multiclass.td`*
-
 A `multiclass` is a **macro that defines multiple records at once**. You define it with `multiclass` and *invoke* it with `defm`.
 
 ### Why it exists
 Consider a 3-address ISA where every arithmetic op has both a `reg, reg, reg` form and a `reg, reg, imm` form. Without multiclasses you'd write twice as many `def`s. With a multiclass you write each pattern once.
 
-### Code — `solution/08_multiclass.td`
+### Code
 ```tablegen
 def GPR;
 def Imm;
@@ -641,8 +627,6 @@ defm CMP : Scalar<0xA>, Predicated;
 
 ## Lesson 9 — `defvar`, `defset`, `deftype`
 
-*Source: `solution/09_defvar_defset.td`*
-
 ### `defvar` — a named, immutable variable
 ```tablegen
 defvar BaseOpc = 0x20;
@@ -694,8 +678,6 @@ Only allowed at top level, and only for primitive types / aliases.
 ---
 
 ## Lesson 10 — Control Flow
-
-*Source: `solution/10_control_flow.td`*
 
 ### `foreach`
 ```tablegen
@@ -766,8 +748,6 @@ Useful while iterating; remove before committing.
 
 ## Lesson 11 — DAGs
 
-*Source: `solution/11_dag.td`*
-
 A `dag` value is a tree node with an **operator** and zero or more **arguments**, each of which can itself be a `dag`.
 
 ### Syntax
@@ -781,7 +761,7 @@ Each `arg` can be:
 
 The operator **must be a record**.
 
-### Code — `solution/11_dag.td`
+### Code
 ```tablegen
 def set;
 def add;
@@ -832,11 +812,9 @@ def Demo {
 
 ## Lesson 12 — Classes as Subroutines
 
-*Source: `solution/12_subroutine.td`*
-
 Because `ClassName<args>` builds an *anonymous record* and you can immediately access its fields, classes work as ad-hoc **functions** that return multiple values.
 
-### Code — `solution/12_subroutine.td`
+### Code
 ```tablegen
 class IsPow2<int n> {
   bit ret = !and(!ne(n, 0), !eq(!and(n, !sub(n, 1)), 0));
@@ -877,8 +855,6 @@ def QR { int Q = DivMod<23, 5>.q; int R = DivMod<23, 5>.r; }   // Q=4, R=3
 ---
 
 ## Lesson 13 — Preprocessing
-
-*Source: `solution/13_preproc.td`*
 
 TableGen ships with a tiny preprocessor — three directives only.
 
@@ -923,11 +899,9 @@ Lookup honors `-I <dir>` flags. The included file is lexically substituted.
 
 ## Lesson 14 — Capstone: A Mini Toy ISA
 
-*Source: `solution/14_miniisa.td`*
-
 Let's combine everything into a small but realistic example: a 4-register, 8-instruction toy ISA called **MiniISA**.
 
-### Code — `solution/14_miniisa.td`
+### Code
 ```tablegen
 //===-- 14_miniisa.td - A toy ISA description in TableGen ------*- tablegen -*-===//
 
@@ -1054,8 +1028,6 @@ Look at the `Summary` record in the output — `NumRegs=4`, `NumCalleeSaved=2`, 
 
 ## Lesson 15 — Instruction Encoding & the `field` keyword
 
-*Source: `solution/15_encoding.td`*
-
 This is the single most common pattern in real LLVM target descriptions, and the
 earlier lessons only hinted at it: building a fixed-width **encoding word** by
 assigning sub-ranges of a `bits<N>` field from other fields.
@@ -1100,15 +1072,13 @@ In a *class* the unassigned operand positions print as `?`; in the concrete
 
 ## Lesson 16 — Running a Real Backend: `--gen-searchable-tables`
 
-*Source: `solution/16_searchable_table.td`*
-
 Every lesson so far used only `--print-records` / `--dump-json`. But the *point*
 of `llvm-tblgen` is its **backends**, which walk the records and emit C++. Most
 backends need a full target's schema, but `--gen-searchable-tables` is general
 purpose: include one support file, describe a table, and it emits a `constexpr`
 array plus binary-search lookup functions.
 
-### Code — `solution/16_searchable_table.td`
+### Code
 ```tablegen
 include "llvm/TableGen/SearchableTable.td"
 
@@ -1183,10 +1153,10 @@ is *for*:
 
 | Theme | Lessons (files in `solution/`) |
 |---|---|
-| The core declarative model | 1 `01_first.td`, 2 `02_class.td`, 3 `03_types.td`, 4 `04_template.td` |
-| Computing values & deriving records | 5 `05_let.td` / `05_exercise.td`, 6 `06_bang_op.td`, 7 `07_paste.td`, 9 `09_defvar_defset.td`, 12 `12_subroutine.td` |
-| Generating & composing many records | 8 `08_multiclass.td`, 10 `10_control_flow.td`, 11 `11_dag.td`, 13 `13_preproc.td` |
-| Producing real C++ output | 14 `14_miniisa.td`, 15 `15_encoding.td`, 16 `16_searchable_table.td` |
+| The core declarative model | 1 [`01_first.td`](solution/01_first.td), 2 [`02_class.td`](solution/02_class.td), 3 [`03_types.td`](solution/03_types.td), 4 [`04_template.td`](solution/04_template.td) |
+| Computing values & deriving records | 5 [`05_let.td`](solution/05_let.td) / [`05_exercise.td`](solution/05_exercise.td), 6 [`06_bang_op.td`](solution/06_bang_op.td), 7 [`07_paste.td`](solution/07_paste.td), 9 [`09_defvar_defset.td`](solution/09_defvar_defset.td), 12 [`12_subroutine.td`](solution/12_subroutine.td) |
+| Generating & composing many records | 8 [`08_multiclass.td`](solution/08_multiclass.td), 10 [`10_control_flow.td`](solution/10_control_flow.td), 11 [`11_dag.td`](solution/11_dag.td), 13 [`13_preproc.td`](solution/13_preproc.td) |
+| Producing real C++ output | 14 [`14_miniisa.td`](solution/14_miniisa.td), 15 [`15_encoding.td`](solution/15_encoding.td), 16 [`16_searchable_table.td`](solution/16_searchable_table.td) |
 
 ```
 language/
