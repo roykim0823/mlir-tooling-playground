@@ -1,9 +1,11 @@
 # Writing TableGen Backends
 
 The sibling [`language/`](../language) tutorial teaches the TableGen *language*
-and uses stock backends (`--print-records`, `--gen-searchable-tables`). This one
-goes the other side: **writing your own backend in C++** — a program that links
-LLVM's TableGen library, parses a `.td` into a `RecordKeeper`, and emits text.
+and reads records back with the stock `--print-records` / `--dump-json` output.
+This one goes the other side: **writing your own backend in C++** — a program
+that links LLVM's TableGen library, parses a `.td` into a `RecordKeeper`, and
+emits text — then closes (Lesson 6) by driving a *stock* backend
+(`--gen-searchable-tables`) end to end.
 
 Based on the [TableGen Backend Developer's Guide](https://llvm.org/docs/TableGen/BackGuide.html).
 Each lesson is a small, self-contained backend you build and run on a `.td` input.
@@ -28,6 +30,7 @@ The backend API splits naturally into stages; each subdirectory is one lesson.
 | `3-init-values/` | 3 — [The `Init` value hierarchy](#lesson-3--the-init-value-hierarchy) | `dyn_cast` over `IntInit`/`StringInit`/`BitsInit`/`ListInit`/`DefInit`/`DagInit`/`UnsetInit` |
 | `4-emitting-and-errors/` | 4 — [Emitting output & errors](#lesson-4--emitting-output--errors) | guarded output, `PrintError`/`PrintFatalError` with record locations |
 | `5-registration/` | 5 — [Registering multiple backends](#lesson-5--registering-multiple-backends) | `TableGen::Emitter::OptClass`, `--gen-*` dispatch (the real llvm-tblgen pattern) |
+| `6-searchable-tables/` | 6 — [Driving a stock backend](#lesson-6--driving-a-stock-backend---gen-searchable-tables) | `--gen-searchable-tables`, the `GET_*_DECL`/`_IMPL` include idiom, linking `libLLVMSupport` |
 
 ## Build & run
 
@@ -157,6 +160,46 @@ int main(int argc, char **argv) {
 ./build/05-registered-tool --gen-names 5-registration/05_registered_tool.td
 ./build/05-registered-tool --gen-count 5-registration/05_registered_tool.td
 ```
+
+## Lesson 6 — Driving a stock backend: `--gen-searchable-tables`
+
+*Source: `6-searchable-tables/06_searchable_table.td` + `06_searchable_demo.cpp`*
+
+Lessons 1–5 *wrote* backends. The mirror image matters just as much: `llvm-tblgen`
+ships backends you can drive without writing any C++. `--gen-searchable-tables`
+is the most target-independent one — include a support file, describe a table,
+and it emits a `constexpr` array plus binary-search lookups.
+
+```tablegen
+include "llvm/TableGen/SearchableTable.td"
+class Inst<string name, bits<8> enc> { string Name = name; bits<8> Encoding = enc; bit HasSideFx = 0; }
+def : Inst<"add", 0x01>;
+def : Inst<"ld",  0x10> { let HasSideFx = 1; }
+
+def InstTable : GenericTable {
+  let FilterClass    = "Inst";
+  let Fields         = ["Name", "Encoding", "HasSideFx"];
+  let PrimaryKey     = ["Encoding"];          // sorted column -> binary search
+  let PrimaryKeyName = "lookupInstByEncoding";
+}
+def lookupInstByName : SearchIndex { let Table = InstTable; let Key = ["Name"]; }
+```
+
+The emitted `.inc` is guarded by `GET_<Table>_DECL` / `GET_<Table>_IMPL` macros;
+the consumer `#include`s it twice (declarations, then definitions in one `.cpp`)
+and links `libLLVMSupport`, because the generated lookups use `StringRef`/`ArrayRef`:
+
+```bash
+./build/06-searchable-demo
+# encoding 0x10 -> ld  (hasSideFx=1)
+# name "mul"   -> encoding 0x03
+# encoding 0x99 -> not found (as expected)
+```
+
+> This is exactly what a real target backend (`--gen-instr-info`,
+> `mlir-tblgen --gen-op-defs`, …) does under the hood: walk records, emit a C++
+> `.inc`, and `#include` it behind `GET_*` macros. `--gen-searchable-tables` is
+> the target-independent version, so it fits in a tutorial.
 
 ---
 

@@ -1,14 +1,16 @@
-// Demonstrates consuming a real `--gen-searchable-tables` backend output.
+// Lesson 6 — consuming a *stock* `--gen-searchable-tables` backend's output.
 //
-// Unlike miniisa_demo.cpp (which uses the schema-agnostic td2cpp.py header),
-// this consumes the genuine LLVM backend output 16_searchable_table.inc. That
-// generated code uses LLVM's StringRef/ArrayRef, so it must link against
-// libLLVMSupport — exactly how real LLVM tools consume these tables.
+// Lessons 1–5 wrote backends in C++; here `llvm-tblgen`'s own
+// `--gen-searchable-tables` emits 06_searchable_table.inc and this file is just
+// the *consumer*. The generated code uses LLVM's StringRef/ArrayRef, so it must
+// link against libLLVMSupport — exactly how real LLVM tools consume these tables.
 //
-// Built by 4-codegen/CMakeLists.txt. Manual build (gen-all.sh emits the .inc):
+// Built by ../CMakeLists.txt (run-all.sh builds + runs it). Manual build:
 //   LLVM=/opt/homebrew/opt/llvm@20
-//   clang++ -std=c++17 $($LLVM/bin/llvm-config --cxxflags) -I ../generated \
-//     4-codegen/searchable_demo.cpp \
+//   $LLVM/bin/llvm-tblgen --gen-searchable-tables -I "$LLVM/include" \
+//     06_searchable_table.td -o 06_searchable_table.inc
+//   clang++ -std=c++17 $($LLVM/bin/llvm-config --cxxflags) -I . \
+//     06_searchable_demo.cpp \
 //     $($LLVM/bin/llvm-config --ldflags --libs support) -o searchable_demo
 #include <cstdint>
 #include <cstdio>
@@ -20,7 +22,7 @@
 using namespace llvm;
 
 // The "row" struct the generated table expects: one member per `Fields` entry
-// in 16_searchable_table.td, in the same order.
+// in 06_searchable_table.td, in the same order.
 struct Inst {
   const char *Name;
   uint8_t     Encoding;
@@ -29,9 +31,9 @@ struct Inst {
 
 // Pull in the generated declarations, then (in this one .cpp) the definitions.
 #define GET_InstTable_DECL
-#include "16_searchable_table.inc"
+#include "06_searchable_table.inc"
 #define GET_InstTable_IMPL
-#include "16_searchable_table.inc"
+#include "06_searchable_table.inc"
 
 int main() {
   if (const Inst *i = lookupInstByEncoding(0x10))   // primary-key binary search

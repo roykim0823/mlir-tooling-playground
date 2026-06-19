@@ -38,3 +38,30 @@ add_backend(02-walk-records    2-records-and-values/02_walk_records.cpp)
 add_backend(03-init-types      3-init-values/03_init_types.cpp)
 add_backend(04-enum-emitter    4-emitting-and-errors/04_enum_emitter.cpp)
 add_backend(05-registered-tool 5-registration/05_registered_tool.cpp)
+
+# -----------------------------------------------------------------------------
+# Lesson 6 — driving a *stock* backend (--gen-searchable-tables) end to end.
+# Unlike lessons 1–5, the backend here is llvm-tblgen's own; this target only
+# generates the table and builds a consumer that links libLLVMSupport.
+# -----------------------------------------------------------------------------
+find_program(LLVM_TBLGEN llvm-tblgen HINTS "${LLVM_TOOLS_BINARY_DIR}")
+if(NOT LLVM_TBLGEN)
+  message(FATAL_ERROR "llvm-tblgen not found near ${LLVM_TOOLS_BINARY_DIR}")
+endif()
+
+set(SEARCHABLE_INC "${CMAKE_CURRENT_BINARY_DIR}/06_searchable_table.inc")
+add_custom_command(
+  OUTPUT  "${SEARCHABLE_INC}"
+  COMMAND ${LLVM_TBLGEN} --gen-searchable-tables
+          -I "${LLVM_INCLUDE_DIRS}"
+          "${CMAKE_CURRENT_SOURCE_DIR}/6-searchable-tables/06_searchable_table.td"
+          -o "${SEARCHABLE_INC}"
+  DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/6-searchable-tables/06_searchable_table.td"
+  COMMENT "llvm-tblgen --gen-searchable-tables: 06_searchable_table.td -> .inc"
+  VERBATIM)
+
+add_executable(06-searchable-demo
+  6-searchable-tables/06_searchable_demo.cpp "${SEARCHABLE_INC}")
+llvm_update_compile_flags(06-searchable-demo)
+target_include_directories(06-searchable-demo PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(06-searchable-demo PRIVATE ${LLVM_BACKEND_LIBS})

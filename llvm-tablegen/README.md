@@ -5,8 +5,8 @@ subfolder:
 
 | Directory | What it teaches |
 |---|---|
-| [`language/`](language) | The TableGen **language** and how to *use* `llvm-tblgen`: records, classes, template args, `let`, bang operators, `multiclass`, DAGs, … up to running a real `--gen-searchable-tables` backend and consuming its C++. |
-| [`backend/`](backend) | Writing your own TableGen **backend** in C++: the `RecordKeeper`/`Record`/`Init` data model, finding records, emitting output, error reporting, and `--gen-*` registration. |
+| [`language/`](language) | The TableGen **language** and how to *use* `llvm-tblgen`: records, classes, template args, `let`, bang operators, `multiclass`, DAGs, … and turning records into C++. |
+| [`backend/`](backend) | Writing your own TableGen **backend** in C++: the `RecordKeeper`/`Record`/`Init` data model, finding records, emitting output, error reporting, `--gen-*` registration, and driving a real stock backend (`--gen-searchable-tables`) end to end. |
 
 Read [`language/`](language/README.md) first (you need to understand `.td`
 files and what a backend consumes), then [`backend/`](backend/README.md) to see

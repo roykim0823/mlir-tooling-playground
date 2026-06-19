@@ -38,7 +38,6 @@ then check yourself against it.
 **Codegen — producing real C++ output**
 - 14 — [Capstone: A Mini Toy ISA](#lesson-14--capstone--a-mini-toy-isa)
 - 15 — [Instruction Encoding & the `field` keyword](#lesson-15--instruction-encoding--the-field-keyword)
-- 16 — [Running a Real Backend: `--gen-searchable-tables`](#lesson-16--running-a-real-backend---gen-searchable-tables)
 
 - [Appendix: Bang-Operator Cheat Sheet](#appendix--bang-operator-cheat-sheet)
 
@@ -997,35 +996,6 @@ Look at the `Summary` record in the output — `NumRegs=4`, `NumCalleeSaved=2`, 
 
 ---
 
-## Appendix — Bang-Operator Cheat Sheet
-
-| Operator | Description |
-|---|---|
-| `!add`, `!sub`, `!mul`, `!div` | Arithmetic on ints. |
-| `!and`, `!or`, `!xor`, `!not` | Bitwise / logical. |
-| `!shl`, `!srl`, `!sra` | Shift left, shift right logical, shift right arithmetic. |
-| `!eq`, `!ne`, `!lt`, `!le`, `!gt`, `!ge` | Comparisons. |
-| `!if(c, a, b)` | Conditional expression. |
-| `!cond(c1:v1, c2:v2, ..., true:vd)` | Multi-way conditional. |
-| `!cast<T>(x)` | Type cast or record-by-name lookup. |
-| `!isa<T>(x)` | Type test. |
-| `!exists<T>(name)` | Does a record by that name & type exist? |
-| `!initialized(x)` | Is `x` not `?` ? |
-| `!size`, `!head`, `!tail`, `!empty` | List/string/DAG size & access. |
-| `!listconcat`, `!listflatten`, `!listsplat`, `!listremove`, `!range` | List construction. |
-| `!foreach(v, seq, expr)` | Map over a list or dag. |
-| `!filter(v, list, pred)` | Filter a list. |
-| `!foldl(init, list, acc, v, expr)` | Left fold. |
-| `!strconcat`, `!substr`, `!find`, `!interleave`, `!toupper`, `!tolower` | String ops. |
-| `!logtwo` | Integer floor log₂. |
-| `!repr` | Debug stringification. |
-| `!con`, `!dag`, `!getdagop`, `!getdagarg`, `!getdagname`, `!setdagop`, `!setdagarg`, `!setdagname`, `!getdagopname`, `!setdagopname` | DAG manipulation. |
-| `!match` | Regex match on strings. |
-| `!instances<T>([regex])` | Enumerate records of type T (with optional regex filter). |
-| `!subst(target, repl, value)` | Substitute target with repl in a string or record name. |
-
----
-
 ## Lesson 15 — Instruction Encoding & the `field` keyword
 
 This is the single most common pattern in real LLVM target descriptions, and the
@@ -1070,85 +1040,40 @@ In a *class* the unassigned operand positions print as `?`; in the concrete
 
 ---
 
-## Lesson 16 — Running a Real Backend: `--gen-searchable-tables`
+## Appendix — Bang-Operator Cheat Sheet
 
-Every lesson so far used only `--print-records` / `--dump-json`. But the *point*
-of `llvm-tblgen` is its **backends**, which walk the records and emit C++. Most
-backends need a full target's schema, but `--gen-searchable-tables` is general
-purpose: include one support file, describe a table, and it emits a `constexpr`
-array plus binary-search lookup functions.
-
-### Code
-```tablegen
-include "llvm/TableGen/SearchableTable.td"
-
-class Inst<string name, bits<8> enc> {
-  string  Name      = name;
-  bits<8> Encoding  = enc;
-  bit     HasSideFx = 0;
-}
-
-def : Inst<"add", 0x01>;
-def : Inst<"ld",  0x10> { let HasSideFx = 1; }
-// ...
-
-def InstTable : GenericTable {
-  let FilterClass    = "Inst";
-  let Fields         = ["Name", "Encoding", "HasSideFx"];
-  let PrimaryKey     = ["Encoding"];          // sorted column -> binary search
-  let PrimaryKeyName = "lookupInstByEncoding";
-}
-
-def lookupInstByName : SearchIndex {          // a second lookup, by name
-  let Table = InstTable;
-  let Key   = ["Name"];
-}
-```
-
-### Generate the C++
-```bash
-llvm-tblgen --gen-searchable-tables \
-  -I <llvm-include-dir> solution/16_searchable_table.td -o 16_searchable_table.inc
-```
-(`gen-all.sh` runs exactly this and writes `generated/16_searchable_table.inc`.)
-
-The emitted `.inc` contains a `constexpr Inst InstTable[]` and two lookup
-functions (`lookupInstByEncoding`, `lookupInstByName`). It is guarded by
-`GET_<Table>_DECL` / `GET_<Table>_IMPL` macros — the standard LLVM idiom:
-
-```cpp
-struct Inst { const char *Name; uint8_t Encoding; bool HasSideFx; };
-
-#define GET_InstTable_DECL
-#include "generated/16_searchable_table.inc"   // declarations
-#define GET_InstTable_IMPL
-#include "generated/16_searchable_table.inc"   // definitions (one .cpp only)
-```
-
-Because the generated lookups use LLVM's `StringRef`/`ArrayRef`, the consumer
-links against `libLLVMSupport` — exactly how real LLVM tools use these tables.
-`searchable_demo.cpp` shows it end to end:
-```bash
-LLVM=/opt/homebrew/opt/llvm@20
-clang++ -std=c++17 $($LLVM/bin/llvm-config --cxxflags) searchable_demo.cpp \
-  $($LLVM/bin/llvm-config --ldflags --libs support) -o searchable_demo
-./searchable_demo
-# encoding 0x10 -> ld  (hasSideFx=1)
-# name "mul"   -> encoding 0x03
-# encoding 0x99 -> not found (as expected)
-```
-
-> This is the real thing `mlir-tblgen --gen-op-defs` does too: walk records,
-> emit a C++ `.inc`, and `#include` it behind `GET_*` macros. `--gen-searchable-tables`
-> is just the most target-independent example of that pipeline.
+| Operator | Description |
+|---|---|
+| `!add`, `!sub`, `!mul`, `!div` | Arithmetic on ints. |
+| `!and`, `!or`, `!xor`, `!not` | Bitwise / logical. |
+| `!shl`, `!srl`, `!sra` | Shift left, shift right logical, shift right arithmetic. |
+| `!eq`, `!ne`, `!lt`, `!le`, `!gt`, `!ge` | Comparisons. |
+| `!if(c, a, b)` | Conditional expression. |
+| `!cond(c1:v1, c2:v2, ..., true:vd)` | Multi-way conditional. |
+| `!cast<T>(x)` | Type cast or record-by-name lookup. |
+| `!isa<T>(x)` | Type test. |
+| `!exists<T>(name)` | Does a record by that name & type exist? |
+| `!initialized(x)` | Is `x` not `?` ? |
+| `!size`, `!head`, `!tail`, `!empty` | List/string/DAG size & access. |
+| `!listconcat`, `!listflatten`, `!listsplat`, `!listremove`, `!range` | List construction. |
+| `!foreach(v, seq, expr)` | Map over a list or dag. |
+| `!filter(v, list, pred)` | Filter a list. |
+| `!foldl(init, list, acc, v, expr)` | Left fold. |
+| `!strconcat`, `!substr`, `!find`, `!interleave`, `!toupper`, `!tolower` | String ops. |
+| `!logtwo` | Integer floor log₂. |
+| `!repr` | Debug stringification. |
+| `!con`, `!dag`, `!getdagop`, `!getdagarg`, `!getdagname`, `!setdagop`, `!setdagarg`, `!setdagname`, `!getdagopname`, `!setdagopname` | DAG manipulation. |
+| `!match` | Regex match on strings. |
+| `!instances<T>([regex])` | Enumerate records of type T (with optional regex filter). |
+| `!subst(target, repl, value)` | Substitute target with repl in a string or record name. |
 
 ---
 
 ## Directory layout
 
-All 16 lesson files are reference **solutions** (the worked code plus the answers
+All 15 lesson files are reference **solutions** (the worked code plus the answers
 to the "try it yourself" exercises) and live flat in `solution/`, numbered
-`01`–`16` in reading order. The table groups them by theme — what each concept
+`01`–`15` in reading order. The table groups them by theme — what each concept
 is *for*:
 
 | Theme | Lessons (files in `solution/`) |
@@ -1156,12 +1081,12 @@ is *for*:
 | The core declarative model | 1 [`01_first.td`](solution/01_first.td), 2 [`02_class.td`](solution/02_class.td), 3 [`03_types.td`](solution/03_types.td), 4 [`04_template.td`](solution/04_template.td) |
 | Computing values & deriving records | 5 [`05_let.td`](solution/05_let.td) / [`05_exercise.td`](solution/05_exercise.td), 6 [`06_bang_op.td`](solution/06_bang_op.td), 7 [`07_paste.td`](solution/07_paste.td), 9 [`09_defvar_defset.td`](solution/09_defvar_defset.td), 12 [`12_subroutine.td`](solution/12_subroutine.td) |
 | Generating & composing many records | 8 [`08_multiclass.td`](solution/08_multiclass.td), 10 [`10_control_flow.td`](solution/10_control_flow.td), 11 [`11_dag.td`](solution/11_dag.td), 13 [`13_preproc.td`](solution/13_preproc.td) |
-| Producing real C++ output | 14 [`14_miniisa.td`](solution/14_miniisa.td), 15 [`15_encoding.td`](solution/15_encoding.td), 16 [`16_searchable_table.td`](solution/16_searchable_table.td) |
+| Producing real C++ output | 14 [`14_miniisa.td`](solution/14_miniisa.td), 15 [`15_encoding.td`](solution/15_encoding.td) |
 
 ```
 language/
-├── solution/          # all 16 lesson .td files, flat (01-16)
-├── codegen-demo/      # C++ demo drivers for lessons 14-16 + CMakeLists.txt
+├── solution/          # all 15 lesson .td files, flat (01-15)
+├── codegen-demo/      # C++ demo drivers for lessons 14-15 + CMakeLists.txt
 ├── generated/         # td2cpp.py / backend output (git-ignored)
 ├── gen-all.sh         # convert every solution/*.td -> generated/
 └── td2cpp.py          # generic .td -> C++ header converter (--dump-json)
@@ -1180,40 +1105,33 @@ files. The one backend that works on *any* `.td` file is `--dump-json`, so the
 - everything wrapped in a `namespace tdgen_<file>`.
 
 ```bash
-./gen-all.sh                                  # every *.td -> generated/<name>.gen.h,
-                                              #   plus the real backend for Lesson 16
+./gen-all.sh                                  # every *.td -> generated/<name>.gen.h
 python3 td2cpp.py solution/11_dag.td   # or convert a single file
 ```
 
-So there are **two flavors of "td → C++"** in this repo:
+`td2cpp.py` is a schema-agnostic stand-in: it drives the one backend
+(`--dump-json`) that works on *any* records. To see a **real** LLVM backend
+pipeline — a `.td` consumed by a genuine `--gen-*` backend that emits a `.inc`
+you `#include` behind `GET_*` macros (linking `libLLVMSupport`) — see
+[`../backend`](../backend) Lesson 6 (`--gen-searchable-tables`).
 
-| Path | Used for | Mechanism |
-|---|---|---|
-| `td2cpp.py` | every generic lesson file | `--dump-json` → schema-agnostic C++ header (`generated/*.gen.h`) |
-| `--gen-searchable-tables` | `16_searchable_table.td` | a **real LLVM backend** → `generated/16_searchable_table.inc` (Lesson 16) |
-
-`td2cpp.py` is a stand-in that works on *any* records; Lesson 16 shows the
-genuine LLVM backend pipeline (`#include` behind `GET_*` macros, link
-`libLLVMSupport`).
-
-> `gen-all.sh` and `td2cpp.py` default to the Homebrew `llvm@20` path for
-> `llvm-tblgen` — edit the variable at the top of each if your install differs.
+> `td2cpp.py` defaults to the Homebrew `llvm@20` path for `llvm-tblgen` — edit
+> the variable at the top if your install differs.
 
 ### Building the C++ examples with CMake
 
-Lessons 14–16 each have a C++ consumer in `codegen-demo/`, and
-`codegen-demo/CMakeLists.txt` builds **all three at once** — it runs
-`llvm-tblgen` / `td2cpp.py` (reading the `.td` from `../solution/`) as part of
-the build, so there's no need to run `gen-all.sh` first:
+Lessons 14 and 15 each have a C++ consumer in `codegen-demo/`, and
+`codegen-demo/CMakeLists.txt` builds **both at once** — it runs `td2cpp.py`
+(reading the `.td` from `../solution/`) as part of the build, so there's no need
+to run `gen-all.sh` first:
 
 ```bash
 cd codegen-demo
-cmake -S . -B build           # add -DLLVM_DIR=/opt/homebrew/opt/llvm@20/lib/cmake/llvm if needed
+cmake -S . -B build
 cmake --build build
 
 ./build/miniisa_demo          # Lesson 14 — consumes 14_miniisa.gen.h   (td2cpp.py)
 ./build/encoding_demo         # Lesson 15 — consumes 15_encoding.gen.h  (td2cpp.py)
-./build/searchable_demo       # Lesson 16 — consumes 16_searchable_table.inc (real backend)
 ```
 
 Expected output:
@@ -1225,21 +1143,14 @@ CALL  mnemonic=call isCall=1 isBranch=1
 # encoding_demo
 ADD  (R-type) encoding = 0x00430820
 ADDI (I-type) encoding = 0x2041002a
-# searchable_demo
-encoding 0x10 -> ld  (hasSideFx=1)
-name "mul"   -> encoding 0x03
-encoding 0x99 -> not found (as expected)
 ```
-
-`searchable_demo` is the one that links `libLLVMSupport` (the generated lookups
-use LLVM's `StringRef`/`ArrayRef`); CMake wires that up via `find_package(LLVM)`.
 
 ---
 
 ## Where to go next
 
 - **TableGen Backends** — `llvm/docs/TableGen/BackEnds.html` — what each official backend consumes.
-- **TableGen Backend Developer's Guide** — how to write your own backend that walks the records and emits text.
+- **TableGen Backend Developer's Guide** — how to write your own backend that walks the records and emits text. The sibling [`../backend`](../backend) tutorial is a hands-on version (it also hosts the `--gen-searchable-tables` lesson).
 - **`llvm/lib/Target/<Target>/*.td`** — real-world examples (start with AArch64 or RISCV).
 
 > **Pro tip.** When something doesn't behave the way you expect, add a `dump !repr(...)` in a multiclass or `--print-detailed-records` on the command line. TableGen's metaprogramming surface is small but unusual, and printing the actual record state is almost always faster than reasoning about it.

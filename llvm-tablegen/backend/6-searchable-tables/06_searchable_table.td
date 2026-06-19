@@ -1,17 +1,17 @@
 // =============================================================================
-// Lesson 16 — Running a *real* backend: `--gen-searchable-tables`
+// Lesson 6 — Driving a *stock* backend end to end: `--gen-searchable-tables`
 //
-//   Everything up to here used only the generic `--print-records` / `--dump-json`
-//   output. But the whole point of `llvm-tblgen` is its *backends*, which walk
-//   the records and emit C++. Most backends need a full target's schema, but
-//   `--gen-searchable-tables` is general purpose: include one support file and
-//   describe a table, and it emits a `constexpr` array plus binary-search
-//   lookup functions.
+//   Lessons 1–5 wrote backends by hand. This one is the mirror image: it drives
+//   a backend that already ships with `llvm-tblgen`. `--gen-searchable-tables`
+//   is general purpose — include one support file and describe a table, and it
+//   emits a `constexpr` array plus binary-search lookup functions. (Most stock
+//   backends, e.g. `--gen-instr-info`, need a full target's schema; this one
+//   does not, which is why we can drive it from a tutorial `.td`.)
 //
-//   Generate the C++ with (see gen-all.sh, which does this for you):
+//   Generate the C++ with (CMakeLists.txt / run-all.sh do this for you):
 //
 //     llvm-tblgen --gen-searchable-tables \
-//       -I <llvm-include-dir> 16_searchable_table.td -o 16_searchable_table.inc
+//       -I <llvm-include-dir> 06_searchable_table.td -o 06_searchable_table.inc
 //
 //   The emitted .inc is guarded by GET_<Table>_DECL / GET_<Table>_IMPL macros:
 //   #define GET_InstTable_DECL before including it to pull in the declarations,

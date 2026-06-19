@@ -26,8 +26,8 @@ capstone additionally links against `libMLIR`.
 ## Contents
 
 - [`llvm-tablegen/`](llvm-tablegen) — LLVM's `llvm-tblgen`, in two parts:
-  - [`language/`](llvm-tablegen/language) — the TableGen language, from first records to a real `--gen-searchable-tables` backend.
-  - [`backend/`](llvm-tablegen/backend) — writing your own TableGen backend in C++ (RecordKeeper, the `Init` hierarchy, emitting + errors, `--gen-*` registration).
+  - [`language/`](llvm-tablegen/language) — the TableGen language, from first records to generating C++ from `.td` files.
+  - [`backend/`](llvm-tablegen/backend) — writing your own TableGen backend in C++ (RecordKeeper, the `Init` hierarchy, emitting + errors, `--gen-*` registration) plus driving a real `--gen-searchable-tables` backend.
 - [`mlir-tablegen/`](mlir-tablegen) — MLIR's `mlir-tblgen` workflows:
   - [`ods/`](mlir-tablegen/ods) — **ODS**: defining operations (operands, results, traits, assembly format, builders, enums).
   - [`attrs-and-types/`](mlir-tablegen/attrs-and-types) — defining custom attributes & types (`AttrDef` / `TypeDef`).

@@ -16,3 +16,4 @@ run 03-init-types      3-init-values/03_init_types.td
 run 04-enum-emitter    4-emitting-and-errors/04_enum_emitter.td
 run 05-registered-tool --gen-names 5-registration/05_registered_tool.td
 run 05-registered-tool --gen-count 5-registration/05_registered_tool.td
+run 06-searchable-demo
