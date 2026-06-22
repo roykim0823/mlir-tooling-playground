@@ -9,6 +9,7 @@
 //
 //   Generate C++ with (see ../../gen-all.sh):
 //     mlir-tblgen --gen-dialect-decls -I <mlir-include> 01_dialect.td
+//     mlir-tblgen --gen-dialect-defs  -I <mlir-include> 01_dialect.td
 //     mlir-tblgen --gen-op-decls      -I <mlir-include> 01_dialect.td
 //     mlir-tblgen --gen-op-defs       -I <mlir-include> 01_dialect.td
 // =============================================================================

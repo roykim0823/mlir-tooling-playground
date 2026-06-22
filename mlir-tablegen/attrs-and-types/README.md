@@ -56,7 +56,11 @@ def Toy_ShapeAttr : AttrDef<Toy_Dialect, "Shape"> {
 ```
 
 The dialect needs `let useDefaultAttributePrinterParser = 1;` so it can dispatch
-on the mnemonic. **Generates:** `--gen-attrdef-decls` / `--gen-attrdef-defs`.
+on the mnemonic. **Generates:** `--gen-attrdef-decls` / `--gen-attrdef-defs` for
+`ShapeAttr` — and, because this is the tutorial's intro lesson, `gen-all.sh` also
+runs `--gen-dialect-decls` / `--gen-dialect-defs` for the `ToyDialect` class here,
+so `01_attrdef` produces **four** `.inc` files. (Later lessons redefine the same
+dialect for standalone-ness but don't re-emit it.)
 
 ## Lesson 2 — Defining a custom type (TypeDef)
 
