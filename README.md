@@ -43,4 +43,4 @@ capstone additionally links against `libMLIR`.
 - ✅ **`mlir-tablegen/attrs-and-types/`** — custom attrs & types, 10 lessons across 5 groups.
 - ✅ **`mlir-tablegen/drr/`** — declarative rewrite rules, 5 lessons (`1-basics/` → `5-directives/`).
 - ✅ **`mlir-tablegen/capstone-toy/`** — buildable Toy dialect wiring ODS + DRR through nine `mlir-tblgen` backends.
-- ✅ **`lit-and-filecheck/`** — 6 lessons plus a runnable `example/` lit test suite and `scripts/` runners.
+- ✅ **`lit-and-filecheck/`** — a single-README, 6-chapter tutorial plus a runnable `example/` lit test suite and a one-command `scripts/try.sh` runner.

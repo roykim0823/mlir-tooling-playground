@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Runnable "Try it" commands for the lit & FileCheck tutorial (see ../README.md).
+# Runnable transcript for the lit & FileCheck tutorial.
 #
-#   scripts/try.sh            # run every chapter, in order (same as 'all')
+#   scripts/try.sh            # run every section, in order (same as 'all')
 #   scripts/try.sh all
-#   scripts/try.sh 3          # run just Chapter 3   (1..6; leading zero ok)
+#   scripts/try.sh 3          # run just one section  (1..6; leading zero ok)
 #
-# Each command is echoed before it runs, so the output reads like a transcript
-# of that chapter's "Try it" section. Override the toolchain with:
-#   LLVM_BIN=/path/to/llvm-build/bin scripts/try.sh
+# Sections 1-6 mirror Tutorials 1-6 in ../README.md. Each command is echoed
+# before it runs, so the output reads like a transcript. Override the toolchain
+# with:  LLVM_BIN=/path/to/llvm-build/bin scripts/try.sh
 #
-# This script only drives the *chapter* commands; it delegates building the
+# This script only drives the example commands; it delegates building the
 # example project to example/run.sh (via ensure_built).
 set -euo pipefail
 
@@ -83,102 +83,91 @@ ensure_built() {
   fi
 }
 
-# Chapter 6 mutates test files; this restores them however the script exits.
-# The trap is always registered but a no-op until chapter_06 sets CH6_INVALID_BAK.
-CH6_INVALID_BAK=""
-ch6_cleanup() {
-  [[ -n "$CH6_INVALID_BAK" ]] || return 0
+# Tutorial 6 writes test/double_negate.mlir; remove it however we exit, so the
+# script is safe to re-run.
+cleanup() {
   rm -f "$EXAMPLE/test/double_negate.mlir"
-  [[ -f "$CH6_INVALID_BAK" ]] && cp "$CH6_INVALID_BAK" "$EXAMPLE/test/invalid.mlir" && rm -f "$CH6_INVALID_BAK"
-  rm -f /tmp/lit_ex_out.mlir
 }
-trap ch6_cleanup EXIT
+trap cleanup EXIT
 
 # --- per-chapter "Try it" blocks --------------------------------------------
 chapter_01() {
   cd "$EXAMPLE"
-  section "Chapter 1 — lit basics"
-  section "1) List every discovered test without running anything"
+  section "Tutorial 1 — lit basics"
+  section "Step 1 — run the suite"
+  run "llvm-lit build/test"
+  section "Step 2 — see what lit discovered (and why: the .mlir suffix)"
   run "llvm-lit --show-tests build/test"
-  section "2) Run just one test, verbosely"
-  run "llvm-lit -v build/test --filter='cse\.mlir'"
-  section "3) Run all tests and time each one"
-  run "llvm-lit -v --time-tests build/test"
-  echo; echo ">> Chapter 1 examples complete."
+  section "Step 3 — watch one RUN line expand (note %s and the tool paths)"
+  run "llvm-lit -a build/test --filter='canonicalize\.mlir'"
+  echo; echo ">> Tutorial 1 examples complete."
 }
 
 chapter_02() {
   cd "$EXAMPLE"
-  section "Chapter 2 — FileCheck basics"
-  section "1) See the raw transformed IR (what FileCheck will receive)"
-  run "mlir-opt test/cse.mlir -cse"
-  section "2) Verify it — silence + exit 0 means pass"
-  run "mlir-opt test/cse.mlir -cse | FileCheck test/cse.mlir && echo 'exit code: '\$?"
-  section "3) Make it FAIL on purpose to read the diagnostic"
-  run_expect_fail "mlir-opt test/cse.mlir -cse | FileCheck <(echo '// CHECK: arith.muli')"
-  echo; echo ">> Chapter 2 examples complete."
+  section "Tutorial 2 — FileCheck basics"
+  section "Step 1 — smallest check: ordered patterns match (exit 0)"
+  run "printf 'alpha\nbeta\ngamma\n' | FileCheck <(printf 'CHECK: alpha\nCHECK: gamma\n') && echo 'exit: '\$?"
+  section "Step 2 — order is enforced: the wrong order fails"
+  run_expect_fail "printf 'alpha\nbeta\ngamma\n' | FileCheck <(printf 'CHECK: gamma\nCHECK: alpha\n')"
+  section "Step 3 — a missing pattern fails (read the diagnostic)"
+  run_expect_fail "printf 'alpha\nbeta\ngamma\n' | FileCheck <(printf 'CHECK: delta\n')"
+  section "Step 3 (real IR) — the same failure via broken/expects_muli.mlir"
+  run_expect_fail "mlir-opt broken/expects_muli.mlir -cse | FileCheck broken/expects_muli.mlir --dump-input=fail"
+  section "Step 4 — whitespace is canonicalized"
+  run "printf 'a      b\n' | FileCheck <(printf 'CHECK: a b\n') && echo PASS"
+  echo; echo ">> Tutorial 2 examples complete."
 }
 
 chapter_03() {
   cd "$EXAMPLE"
-  section "Chapter 3 — FileCheck directives"
-  section "Inspect the output, then watch the directives match it (--dump-input=fail)"
-  run "mlir-opt test/cse.mlir -cse | FileCheck test/cse.mlir --dump-input=fail && echo PASS"
-  section "Bonus: the same on canonicalize.mlir (CHECK-NOT + plain CHECK)"
-  run "mlir-opt test/canonicalize.mlir -canonicalize | FileCheck test/canonicalize.mlir && echo PASS"
-  echo; echo ">> Chapter 3 examples complete."
+  section "Tutorial 3 — FileCheck directives"
+  section "CHECK-NEXT — adjacent lines match"
+  run "printf 'alpha\nbeta\n' | FileCheck <(printf 'CHECK: alpha\nCHECK-NEXT: beta\n') && echo PASS"
+  section "CHECK-NEXT — a gap between them fails"
+  run_expect_fail "printf 'alpha\nbeta\ngamma\n' | FileCheck <(printf 'CHECK: alpha\nCHECK-NEXT: gamma\n')"
+  section "CHECK-NOT — a forbidden pattern is present, so it fails"
+  run_expect_fail "printf 'alpha\nbeta\ngamma\n' | FileCheck <(printf 'CHECK: alpha\nCHECK-NOT: beta\nCHECK: gamma\n')"
+  section "CHECK-COUNT-3 — exactly three in a row"
+  run "printf 'x\nx\nx\n' | FileCheck <(printf 'CHECK-COUNT-3: x\n') && echo PASS"
+  section "CHECK-DAG — matches in any order (both inputs pass)"
+  run "printf 'one\ntwo\n' | FileCheck <(printf 'CHECK-DAG: one\nCHECK-DAG: two\n') && echo PASS"
+  run "printf 'two\none\n' | FileCheck <(printf 'CHECK-DAG: one\nCHECK-DAG: two\n') && echo PASS"
+  echo; echo ">> Tutorial 3 examples complete."
 }
 
 chapter_04() {
   cd "$EXAMPLE"
-  section "Chapter 4 — patterns and variables"
-  section "1) The capture-and-reuse test (both returns share one value after CSE)"
-  run "cat test/cse.mlir"
-  run "mlir-opt test/cse.mlir -cse | FileCheck test/cse.mlir && echo PASS"
-  section "2) Experiment: point one use at an undefined variable -> error"
-  local BROKEN; BROKEN="$(mktemp)"
-  run "sed 's/%\[\[RESULT\]\], %\[\[RESULT\]\]/%[[RESULT]], %[[OTHER]]/' test/cse.mlir > '$BROKEN'"
-  run_expect_fail "mlir-opt test/cse.mlir -cse | FileCheck '$BROKEN'"
-  rm -f "$BROKEN"
-  echo ">> Note the 'undefined variable: OTHER' — captures are real bindings, not decoration."
-  echo; echo ">> Chapter 4 examples complete."
+  section "Tutorial 4 — patterns and variables"
+  section "Step 1 — embed a regex with {{ ... }}"
+  run "printf 'register r42\n' | FileCheck <(printf 'CHECK: register {{r[0-9]+}}\n') && echo PASS"
+
+  section "Step 2 — capture a string variable and reuse it (the cse.mlir idiom)"
+  run "mlir-opt test/cse.mlir -cse | FileCheck test/cse.mlir && echo 'PASS (both returns share one value)'"
+
+  section "Step 2b — break the binding: a use with no definition (broken/undefined_var.mlir)"
+  run_expect_fail "mlir-opt broken/undefined_var.mlir -cse | FileCheck broken/undefined_var.mlir"
+  echo ">> Note 'undefined variable: OTHER' — captures are real bindings, not decoration."
+
+  section "Step 3 — numeric capture and arithmetic"
+  run "printf 'load r3\nload r4\n' | FileCheck <(printf 'CHECK: load r[[#REG:]]\nCHECK: load r[[#REG+1]]\n') && echo PASS"
+  echo; echo ">> Tutorial 4 examples complete."
 }
 
 chapter_05() {
   cd "$EXAMPLE"
-  section "Chapter 5 — MLIR testing conventions"
-  section "A check test (canonicalize)"
+  section "Tutorial 5 — MLIR testing conventions"
+  section "A check test (canonicalize) via the lit runner"
   run "llvm-lit -v build/test --filter='canonicalize\.mlir'"
   section "A diagnostic test — note -verify-diagnostics in its RUN line"
   run "grep -nE 'RUN:|expected-' test/invalid.mlir"
   run "llvm-lit -v build/test --filter='invalid\.mlir'"
-  echo; echo ">> Chapter 5 examples complete."
+  echo; echo ">> Tutorial 5 examples complete."
 }
 
 chapter_06() {
   cd "$EXAMPLE"
-  # Back up the files Labs 4–5 add/append; ch6_cleanup (EXIT trap) restores them.
-  CH6_INVALID_BAK="$(mktemp)"
-  cp test/invalid.mlir "$CH6_INVALID_BAK"
-
-  section "Chapter 6 — hands-on"
-
-  section "Lab 1 — run a single test three ways"
-  run "cmake --build build --target check"
-  run "llvm-lit -v build/test --filter='cse\.mlir'"
-  run "mlir-opt test/cse.mlir -cse > /tmp/lit_ex_out.mlir && FileCheck test/cse.mlir < /tmp/lit_ex_out.mlir && echo PASS"
-  run "cat /tmp/lit_ex_out.mlir"
-
-  section "Lab 2 — read a failure"
-  run_expect_fail "mlir-opt test/cse.mlir -cse | FileCheck <(printf '// CHECK: arith.muli\n') --dump-input=fail"
-
-  section "Lab 3 — break a captured variable (expect 'undefined variable')"
-  local BROKEN; BROKEN="$(mktemp)"
-  run "sed 's/%\[\[RESULT\]\], %\[\[RESULT\]\]/%[[RESULT]], %[[OTHER]]/' test/cse.mlir > '$BROKEN'"
-  run_expect_fail "mlir-opt test/cse.mlir -cse | FileCheck '$BROKEN'"
-  rm -f "$BROKEN"
-
-  section "Lab 4 — write a new test (auto-discovered, no CMake edit)"
+  section "Tutorial 6 — write your own test (auto-discovered, no CMake edit)"
   cat > test/double_negate.mlir <<'EOF'
 // RUN: mlir-opt %s -canonicalize | FileCheck %s
 
@@ -195,25 +184,8 @@ EOF
   echo ">> created test/double_negate.mlir"
   run "mlir-opt test/double_negate.mlir -canonicalize | FileCheck test/double_negate.mlir && echo PASS"
   run "./run.sh"
-
-  section "Lab 5 — add a diagnostic case"
-  cat >> test/invalid.mlir <<'EOF'
-
-// -----
-
-func.func @bad_return2() -> f32 {
-  %0 = arith.constant 1 : i32
-  // expected-error @+1 {{doesn't match function result type ('f32')}}
-  return %0 : i32
-}
-EOF
-  echo ">> appended a sub-test to test/invalid.mlir"
-  run "llvm-lit -v build/test --filter='invalid\.mlir'"
-
-  section "Lab 6 — cleanup (handled automatically on exit)"
-  echo ">> test/double_negate.mlir removed, test/invalid.mlir restored."
-
-  echo; echo ">> Chapter 6 labs complete."
+  echo ">> (test/double_negate.mlir is removed automatically on exit)"
+  echo; echo ">> Tutorial 6 examples complete."
 }
 
 run_chapter() {
@@ -236,7 +208,7 @@ if [[ "$target" == "all" ]]; then
   for n in 01 02 03 04 05 06; do
     echo
     echo "###################################################################"
-    echo "###  Chapter $n"
+    echo "###  Tutorial $n"
     echo "###################################################################"
     run_chapter "$n"
   done

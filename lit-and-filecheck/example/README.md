@@ -10,12 +10,15 @@ LLVM/MLIR (it reuses the prebuilt `mlir-opt` and `FileCheck`).
 example/
 ├── CMakeLists.txt              # standalone: find_package(MLIR) + lit wiring
 ├── run.sh                      # one command: configure + build + run tests
-└── test/
-    ├── lit.cfg.py              # main lit config (hand-written, standard name)
-    ├── lit.site.cfg.py.in      # site config template (CMake fills paths in)
-    ├── cse.mlir                # CHECK-LABEL, CHECK-NEXT, captured variable
-    ├── canonicalize.mlir       # CHECK-NOT + plain CHECK
-    └── invalid.mlir            # diagnostic test (-verify-diagnostics)
+├── test/                       # the suite lit discovers + runs (all passing)
+│   ├── lit.cfg.py              # main lit config (hand-written, standard name)
+│   ├── lit.site.cfg.py.in      # site config template (CMake fills paths in)
+│   ├── cse.mlir                # CHECK-LABEL, CHECK-NEXT, captured variable
+│   ├── canonicalize.mlir       # CHECK-NOT + plain CHECK
+│   └── invalid.mlir            # diagnostic test (-verify-diagnostics)
+└── broken/                     # intentionally-failing demos (NOT discovered by lit)
+    ├── expects_muli.mlir       # Tutorial 2: a CHECK the pass can't satisfy
+    └── undefined_var.mlir      # Tutorial 2: a use of an undefined variable
 ```
 
 ## Quick start — just run it
@@ -36,7 +39,9 @@ Total Discovered Tests: 3
   Passed: 3 (100.00%)
 ```
 
-`./run.sh clean` removes the build directory.
+`./run.sh configure` stops after generating `build/` and the lit config (handy
+for then running `cmake --build build --target check` or `llvm-lit build/test`
+yourself); `./run.sh clean` removes the build directory.
 
 ### Using a different LLVM/MLIR
 
@@ -97,45 +102,12 @@ conventional ones lit looks for.
 | `canonicalize.mlir` | `mlir-opt %s -canonicalize \| FileCheck %s` | `CHECK-NOT` (the `arith.addi` must vanish when folding `x+0`) + a plain `CHECK` |
 | `invalid.mlir` | `mlir-opt %s -split-input-file -verify-diagnostics` | diagnostic testing with `expected-error @+1 {{...}}` and `// -----` sub-test separators — no FileCheck involved |
 
-## Try it yourself — three exercises
+## Try it yourself
 
-After `./run.sh` once, the tools are easiest to drive directly. Put them on PATH:
-
-```bash
-export PATH="$PWD/../../../externals/llvm-project/build/bin:$PATH"
-```
-
-**1. Watch one test run by hand** (exactly what the RUN line does):
-
-```bash
-mlir-opt test/cse.mlir -cse              # see the transformed IR
-mlir-opt test/cse.mlir -cse | FileCheck test/cse.mlir && echo PASS
-```
-
-**2. Make it fail and read the diagnostic.** Edit `test/cse.mlir`, change the
-second `%[[RESULT]]` to `%[[OTHER]]`, rerun `./run.sh`. FileCheck reports an
-*undefined variable* — proving the two uses are genuinely tied to the capture.
-Revert when done.
-
-**3. Add your own test.** Drop a new `.mlir` into `test/` and rerun `./run.sh`.
-Because `add_lit_testsuite` discovers tests by the `.mlir` suffix, no CMake edit
-is needed — just re-run. Example:
-
-```bash
-cat > test/negate.mlir <<'EOF'
-// RUN: mlir-opt %s -canonicalize | FileCheck %s
-// CHECK-LABEL: func.func @double_negate
-// CHECK-NOT: arith.subi
-// CHECK: return %arg0
-func.func @double_negate(%arg0: i32) -> i32 {
-  %c0 = arith.constant 0 : i32
-  %0 = arith.subi %c0, %arg0 : i32   // -x
-  %1 = arith.subi %c0, %0 : i32      // -(-x) == x
-  return %1 : i32
-}
-EOF
-./run.sh
-```
+This project is the playground for the [tutorial one level up](../README.md):
+six hands-on tutorials that run a test, read failures, build up every FileCheck
+directive, and write your own (`add_lit_testsuite` discovers any new `.mlir` by
+its suffix, so no CMake edit is needed — just re-run `./run.sh`).
 
 ## Turning this into a *real* project
 

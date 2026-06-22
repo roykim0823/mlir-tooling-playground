@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # One-command build + test for the standalone lit/FileCheck example.
 #
-#   ./run.sh           configure (if needed), build the `check` target, run tests
+#   ./run.sh            configure (if needed), build the `check` target, run tests
+#   ./run.sh configure  configure only — generate build/ and the lit config, then stop
 #   ./run.sh clean      remove the build directory
 #
 # Requires a prebuilt LLVM/MLIR. By default it auto-detects the one shipped in
@@ -66,6 +67,11 @@ echo ">> Configuring (MLIR_DIR=$MLIR_DIR, lit=$LIT, generator=$GENERATOR)"
 cmake -G "$GENERATOR" -S "$HERE" -B "$BUILD" \
   -DMLIR_DIR="$MLIR_DIR" \
   -DLLVM_EXTERNAL_LIT="$LIT"
+
+if [[ "${1:-}" == "configure" ]]; then
+  echo ">> Configured. Run the tests with:  cmake --build $BUILD --target check"
+  exit 0
+fi
 
 echo ">> Building + running the 'check' target (this invokes llvm-lit)"
 cmake --build "$BUILD" --target check
