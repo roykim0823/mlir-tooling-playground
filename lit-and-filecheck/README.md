@@ -61,7 +61,7 @@ cd example
 ./run.sh
 ```
 
-Expected tail: `Passed: 3 (100.00%)`.
+Expected tail: `Passed: 4 (100.00%)`.
 
 If `run.sh` can't find your LLVM, or you're on Homebrew and see "llvm-lit not
 found", that's normal and handled — see the
@@ -120,13 +120,13 @@ llvm-lit build/test
 ```
 
 ```
--- Testing: 3 tests, 3 workers --
+-- Testing: 4 tests, 4 workers --
 Testing Time: 0.26s
-Total Discovered Tests: 3
-  Passed: 3 (100.00%)
+Total Discovered Tests: 4
+  Passed: 4 (100.00%)
 ```
 
-lit found three tests, ran each, and all passed. That's the whole loop.
+lit found four tests, ran each, and all passed. That's the whole loop.
 
 ### Step 2 — see what lit discovered, and why
 
@@ -138,6 +138,7 @@ llvm-lit --show-tests build/test
 -- Available Tests --
   LIT_FILECHECK_EXAMPLE :: canonicalize.mlir
   LIT_FILECHECK_EXAMPLE :: cse.mlir
+  LIT_FILECHECK_EXAMPLE :: filecheck_directives.mlir
   LIT_FILECHECK_EXAMPLE :: invalid.mlir
 ```
 
@@ -217,6 +218,13 @@ So `// RUN: mlir-opt %s -cse | FileCheck %s` means "run the freshly-built
 - The comment marker is the file's own (`//` for MLIR/C++, `;` for LLVM IR, `#` for asm).
 - Multiple RUN lines run **in sequence**; any non-zero exit FAILs the test.
 - Pipes and redirection (`|`, `>`, `<`) work; split a long line with trailing `\`.
+- To assert a command **fails**, prefix it with LLVM's **`not`** utility, which
+  inverts the exit code:
+  `// RUN: not mlir-opt %s -pass-pipeline='…bogus…' 2>&1 | FileCheck %s --check-prefix=ERR`
+  passes only when `mlir-opt` *rejects* the input, with FileCheck verifying the
+  error message on stderr. (`not` ships with LLVM next to `FileCheck`; lit
+  registers it as a substitution.) The `ERR` group of
+  `test/filecheck_directives.mlir` uses exactly this pattern — Tutorial 3 runs it.
 - Keep them minimal — verify with FileCheck, not `grep`.
 
 ### Reference tables
@@ -374,6 +382,14 @@ giving each its own prefix:
 
 `--check-prefixes=CHECK,A` activates several at once.
 
+> **Gotcha — a prefix typo silently disables checks.** FileCheck only looks for
+> the prefixes it is *told about*. Write `// AA: result_from_a` (or forget the
+> `--check-prefix=A` flag) and that directive is never read — the test doesn't
+> fail, it just stops checking anything, forever. When you author a prefixed
+> check, make it fail once on purpose to prove the RUN line really reads it.
+> (Same trap in reverse: a stray `--check-prefix` with zero matching directives
+> is itself an error — FileCheck refuses to run with an empty check list.)
+
 ### Reference table
 
 <details><summary><b>Common <code>FileCheck</code> options</b></summary>
@@ -499,6 +515,102 @@ block. Why it matters:
 Label patterns must be self-contained: they **cannot** define or use `[[...]]`
 variables (labels are matched in a separate first pass).
 
+#### Watch the loophole on real IR — `test/filecheck_directives.mlir`
+
+The danger `CHECK-LABEL` guards against deserves seeing once with your own
+eyes: a plain `CHECK` may skip **any number of lines** on its way to a match —
+including past the end of the function you meant to test. The committed
+`test/filecheck_directives.mlir` is written in the standard upstream shape:
+**one input file, several RUN pipelines**, each verified by its own group of
+directives selected with `--check-prefix` (Tutorial 2 Step 5), the prefixes
+named after the configuration they check:
+
+```mlir
+// RUN: mlir-opt %s | FileCheck %s
+// RUN: mlir-opt %s -cse | FileCheck %s --check-prefix=CSE
+// RUN: mlir-opt %s -canonicalize | FileCheck %s --check-prefix=CANON
+// RUN: not mlir-opt %s -pass-pipeline='builtin.module(no-such-pass)' 2>&1 | FileCheck %s --check-prefix=ERR
+
+func.func @dup_constants() -> (i32, i32) {
+  %0 = arith.constant 1 : i32
+  %1 = arith.constant 1 : i32
+  return %0, %1 : i32, i32
+}
+
+func.func @add_zero(%arg0: i32) -> i32 {
+  %c0 = arith.constant 0 : i32
+  %0 = arith.addi %arg0, %c0 : i32
+  return %0 : i32
+}
+```
+
+Only the *second* function contains an `arith.addi` — and the first RUN
+line's default `CHECK` group is **deliberately broken as a lesson**: it
+claims `@dup_constants` contains one.
+
+```mlir
+// CHECK: func.func @dup_constants
+// CHECK: arith.addi
+```
+
+Run it (from `example/`; `mlir-opt` with no pass flag just parses and
+re-prints):
+
+```bash
+mlir-opt test/filecheck_directives.mlir \
+  | FileCheck test/filecheck_directives.mlir
+echo "exit: $?"        # -> 0. The bogus assertion PASSES.
+```
+
+After matching the `@dup_constants` line, FileCheck skipped over the rest of
+that function, crossed the function boundary, and found `arith.addi` inside
+`@add_zero`. A regression in `@dup_constants` would go completely unnoticed.
+Now wrap the same bogus assertion in labels (inline check file, as in the
+earlier steps):
+
+```bash
+mlir-opt test/filecheck_directives.mlir | FileCheck <(printf 'CHECK-LABEL: func.func @dup_constants\nCHECK: arith.addi\nCHECK-LABEL: func.func @add_zero\n')
+```
+
+(Note the *second* label: a block only ends at the next label, so with one
+label alone the block would run to end-of-input and still leak into
+`@add_zero`.)
+
+```
+error: CHECK: expected string not found in input
+CHECK: arith.addi
+       ^
+<stdin>:2:26: note: scanning from here
+ func.func @dup_constants() -> (i32, i32) {
+                         ^
+<stdin>:3:12: note: possible intended match here
+ %c1_i32 = arith.constant 1 : i32
+           ^
+```
+
+Now the bug is caught: the labels confine the check to `@dup_constants`'s
+block, and the `possible intended match` hint even points at the culprit (a
+`constant`, not an `addi`). This is the loophole-closing in action — and the
+reason every real MLIR test starts each function with a `CHECK-LABEL`. The
+committed `CSE` and `CANON` groups do exactly that, correctly: `CSE` proves
+`-cse` collapses the duplicate constants (label + captures), `CANON` proves
+`-canonicalize` folds `x + 0` away (label + `-SAME` + `-NOT`) — read them in
+the file and you'll recognize every directive from this tutorial.
+
+The fourth RUN line is the `not` utility from Tutorial 1 in its natural
+habitat — testing the **error path**. `not` requires `mlir-opt` to *fail* on
+the bogus pipeline, and `2>&1` routes its stderr into FileCheck, which
+verifies the message:
+
+```mlir
+// RUN: not mlir-opt %s -pass-pipeline='builtin.module(no-such-pass)' 2>&1 | FileCheck %s --check-prefix=ERR
+// ERR: 'no-such-pass' does not refer to a registered pass
+```
+
+This `not`-plus-`ERR` pattern is the standard LLVM idiom for locking in
+"this must be rejected" behavior: unlike the `broken/` files, which live
+outside `test/` because they fail, an *inverted expectation* is a green test.
+
 ### Putting it together — read a real test
 
 Now `example/test/cse.mlir` reads naturally:
@@ -576,6 +688,24 @@ That "undefined variable" proves captures are real bindings, not decoration. Why
 `%[[RESULT:.*]]` and not `[[RESULT:.*]]`? The `%` is literal SSA syntax outside
 the brackets; only the name after it is captured. This is the canonical MLIR
 capture idiom.
+
+For one more runnable example, the `CANON` group of
+`test/filecheck_directives.mlir` (Tutorial 3's demo file) shows the other
+canonical placement of a capture: a `CHECK-LABEL` can't define variables, so
+the `-SAME` continuation captures `%[[ARG]]` from the signature line, and the
+group asserts `-canonicalize` folds `x + 0` into returning that same argument:
+
+```mlir
+// CANON-LABEL: func.func @add_zero(
+// CANON-SAME: %[[ARG:.*]]: i32
+// CANON-NOT: arith.addi
+// CANON: return %[[ARG]]
+```
+
+```bash
+mlir-opt test/filecheck_directives.mlir -canonicalize \
+  | FileCheck test/filecheck_directives.mlir --check-prefix=CANON && echo PASS
+```
 
 ### Step 3 — numeric variables and arithmetic
 
@@ -733,6 +863,8 @@ end-to-end. Upstream examples live under `mlir/test/Integration/`.
 
 ## Tutorial 6 — write your own test
 
+### Step 1 — write one by hand
+
 Tests are discovered by their `.mlir` suffix, so adding one needs no CMake edit —
 drop a file in `test/` and re-run. Here's a canonicalization test (`-(-x)` folds
 back to `x`, so both `subi`s must vanish):
@@ -754,14 +886,93 @@ EOF
 
 # Fast inner loop by hand, then the full suite picks it up automatically:
 mlir-opt test/double_negate.mlir -canonicalize | FileCheck test/double_negate.mlir && echo PASS
-./run.sh        # now reports 4 tests
-
-# clean up — remove the test you just added:
-rm test/double_negate.mlir
+./run.sh        # now reports 5 tests
 ```
 
 You just used `CHECK-LABEL` (block boundary), `CHECK-NOT` (a pattern that must
 *not* appear), and a plain `CHECK` on a real transformation.
+
+### Step 2 — draft exhaustive checks with `generate-test-checks.py`
+
+The checks above are *loose*: they pin down two facts and ignore everything
+else. Real MLIR lowering tests often pin down the **entire** output — every op,
+every operand, every SSA value captured and cross-referenced. Nobody writes 35
+lines of captures by hand. LLVM ships an authoring aid,
+`mlir/utils/generate-test-checks.py`, and it's worth being precise about how it
+relates to FileCheck, because the two are easy to conflate:
+
+- **FileCheck is a verifier that runs every time the test runs.** Input: the
+  pass's actual output + your `CHECK` directives. Output: an exit code. It
+  generates nothing.
+- **`generate-test-checks.py` is a generator that runs once, at authoring
+  time.** Input: one concrete output of your pass. Output: a **draft** of the
+  `CHECK` lines for you to review and paste in. It verifies nothing, never runs
+  at test time, and leaves no trace — FileCheck neither knows nor cares that
+  the directives were generated.
+
+So the division of labor is: the *script* writes a first draft once;
+*FileCheck* enforces it forever after.
+
+The script lives in LLVM's *source tree*, not in installed toolchains
+(Homebrew's `llvm@20` doesn't ship it). It's a single self-contained file:
+
+```bash
+curl -sLo /tmp/generate-test-checks.py \
+  https://raw.githubusercontent.com/llvm/llvm-project/release/20.x/mlir/utils/generate-test-checks.py
+```
+
+Feed it the pass output for the test from Step 1:
+
+```bash
+mlir-opt test/double_negate.mlir -canonicalize | python3 /tmp/generate-test-checks.py
+```
+
+```
+// NOTE: Assertions have been autogenerated by utils/generate-test-checks.py
+
+// The script is designed to make adding checks to
+// a test case fast, it is *not* designed to be authoritative
+// about what constitutes a good test! The CHECK should be
+// minimized and named to reflect the test intent.
+
+// CHECK-LABEL:   func.func @double_negate(
+// CHECK-SAME:                             %[[VAL_0:.*]]: i32) -> i32 {
+// CHECK:           return %[[VAL_0]] : i32
+// CHECK:         }
+```
+
+Everything from Tutorials 3–4 is in the draft: a `CHECK-LABEL` on the
+signature, a `CHECK-SAME` continuation *carrying the argument capture* (a
+label can't hold captures — this is that rule in the wild), and `%[[VAL_0]]`
+reused to assert the returned value is the function's argument. The intended
+workflow is:
+
+```
+run the pass  →  pipe output through generate-test-checks.py
+              →  REVIEW the draft: trim what's incidental,
+                 rename VAL_0, VAL_1, … to meaningful names
+              →  paste into the test file
+              →  from now on, lit + FileCheck enforce it on every run
+```
+
+The script's own disclaimer is the important part: the draft is a starting
+point, not a finished test. Machine names like `VAL_0` say nothing about
+intent — rename them (`ARG`, `RESULT`, …) so a human can read the assertion.
+And trim: the draft asserts *everything* the pass printed, including details
+your test doesn't care about.
+
+**Loose vs. exhaustive is a judgment call.** Exhaustive checks catch more
+regressions; loose checks survive harmless changes to the pass's output. The
+trap with exhaustive checks is that regenerating them is so cheap that when
+one breaks, it's tempting to "fix" the test by regenerating *without reading
+the diff* — which silently bakes a genuine regression into the expected
+output. If you regenerate, diff the old and new checks and convince yourself
+every change is intended.
+
+```bash
+# clean up — remove the test you added in Step 1:
+rm test/double_negate.mlir
+```
 
 ---
 
@@ -785,6 +996,8 @@ out-of-tree project with your own `my-opt` driver, see
 | Reproduce by hand | `mlir-opt FILE -pass \| FileCheck FILE` |
 | Debug a FileCheck fail | add `--dump-input=fail` to the FileCheck call |
 | Verbose output of passing tests | `llvm-lit -a ...` |
+| Assert a RUN command *fails* | prefix it with `not`: `... \| not FileCheck %s --check-prefix=BAD` |
+| Draft exhaustive CHECK lines | `mlir-opt FILE -pass \| python3 generate-test-checks.py` (Tutorial 6) |
 
 | FileCheck directive | Use |
 |---------------------|-----|

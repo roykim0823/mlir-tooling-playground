@@ -133,6 +133,35 @@ chapter_03() {
   section "CHECK-DAG — matches in any order (both inputs pass)"
   run "printf 'one\ntwo\n' | FileCheck <(printf 'CHECK-DAG: one\nCHECK-DAG: two\n') && echo PASS"
   run "printf 'two\none\n' | FileCheck <(printf 'CHECK-DAG: one\nCHECK-DAG: two\n') && echo PASS"
+
+  section "The directive demo file — test/filecheck_directives.mlir"
+  echo ">> One input, four RUN pipelines — each prefix named after the configuration"
+  echo ">> it checks (CSE, CANON, ERR), the standard upstream idiom. Read the comments."
+  run "cat test/filecheck_directives.mlir"
+
+  section "CHECK-LABEL — the loophole, on real IR (the default CHECK group)"
+  echo ">> The default CHECK group is deliberately broken: it claims @dup_constants"
+  echo ">> contains arith.addi — false, yet it PASSES: the plain check skips past the"
+  echo ">> function's end and matches inside @add_zero."
+  run "mlir-opt test/filecheck_directives.mlir | FileCheck test/filecheck_directives.mlir && echo 'PASS (but the assertion is wrong!)'"
+  echo; echo ">> Wrap the same bogus assertion in CHECK-LABELs — now it's caught. (Note the"
+  echo ">> second label: a block only ends at the NEXT label.)"
+  run_expect_fail "mlir-opt test/filecheck_directives.mlir | FileCheck <(printf 'CHECK-LABEL: func.func @dup_constants\nCHECK: arith.addi\nCHECK-LABEL: func.func @add_zero\n')"
+
+  section "The labeled groups done right — CSE and CANON"
+  run "mlir-opt test/filecheck_directives.mlir -cse | FileCheck test/filecheck_directives.mlir --check-prefix=CSE && echo 'PASS (-cse collapses the duplicate constants)'"
+  run "mlir-opt test/filecheck_directives.mlir -canonicalize | FileCheck test/filecheck_directives.mlir --check-prefix=CANON && echo 'PASS (-canonicalize folds x+0 away)'"
+
+  section "CHECK-SAME rejects a next-line match"
+  echo ">> Demand arith.addi on @add_zero's signature line — it exists, but on the"
+  echo ">> NEXT line, so -SAME rejects it ('not on the same line as the previous match'):"
+  run_expect_fail "mlir-opt test/filecheck_directives.mlir | FileCheck <(printf 'CHECK-LABEL: func.func @add_zero(\nCHECK-SAME: arith.addi\n')"
+
+  section "\`not\` — testing the error path (the ERR group)"
+  run "grep -n 'RUN:' test/filecheck_directives.mlir"
+  echo ">> Replay the ERR RUN line exactly as lit would — \`not\` requires mlir-opt to"
+  echo ">> FAIL, and FileCheck verifies the error message on stderr (2>&1):"
+  run "not mlir-opt test/filecheck_directives.mlir -pass-pipeline='builtin.module(no-such-pass)' 2>&1 | FileCheck test/filecheck_directives.mlir --check-prefix=ERR && echo 'exit 0 — the required failure happened, with the right message'"
   echo; echo ">> Tutorial 3 examples complete."
 }
 
@@ -148,6 +177,11 @@ chapter_04() {
   section "Step 2b — break the binding: a use with no definition (broken/undefined_var.mlir)"
   run_expect_fail "mlir-opt broken/undefined_var.mlir -cse | FileCheck broken/undefined_var.mlir"
   echo ">> Note 'undefined variable: OTHER' — captures are real bindings, not decoration."
+
+  section "Step 2c — a capture attached to a label via -SAME (the CANON group)"
+  echo ">> A CHECK-LABEL can't define variables; the -SAME continuation captures the"
+  echo ">> argument from the signature line, and the folded function must return it:"
+  run "mlir-opt test/filecheck_directives.mlir -canonicalize | FileCheck test/filecheck_directives.mlir --check-prefix=CANON && echo 'PASS (x+0 folds to returning the captured argument)'"
 
   section "Step 3 — numeric capture and arithmetic"
   run "printf 'load r3\nload r4\n' | FileCheck <(printf 'CHECK: load r[[#REG:]]\nCHECK: load r[[#REG+1]]\n') && echo PASS"
@@ -184,6 +218,20 @@ EOF
   echo ">> created test/double_negate.mlir"
   run "mlir-opt test/double_negate.mlir -canonicalize | FileCheck test/double_negate.mlir && echo PASS"
   run "./run.sh"
+
+  section "Step 2 — draft exhaustive checks with generate-test-checks.py"
+  local gtc="/tmp/generate-test-checks.py"
+  if [[ ! -f "$gtc" ]]; then
+    echo ">> fetching generate-test-checks.py (single self-contained script)…"
+    curl -sLo "$gtc" \
+      "https://raw.githubusercontent.com/llvm/llvm-project/release/20.x/mlir/utils/generate-test-checks.py" \
+      || { echo ">> (offline? skipping this step — see Tutorial 6 in the README)"; gtc=""; }
+  fi
+  if [[ -n "$gtc" ]]; then
+    echo ">> The script drafts CHECK lines from one concrete pass output;"
+    echo ">> FileCheck then enforces them on every run. Review before pasting!"
+    run "mlir-opt test/double_negate.mlir -canonicalize | python3 $gtc"
+  fi
   echo ">> (test/double_negate.mlir is removed automatically on exit)"
   echo; echo ">> Tutorial 6 examples complete."
 }

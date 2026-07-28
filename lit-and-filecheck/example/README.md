@@ -15,7 +15,8 @@ example/
 │   ├── lit.site.cfg.py.in      # site config template (CMake fills paths in)
 │   ├── cse.mlir                # CHECK-LABEL, CHECK-NEXT, captured variable
 │   ├── canonicalize.mlir       # CHECK-NOT + plain CHECK
-│   └── invalid.mlir            # diagnostic test (-verify-diagnostics)
+│   ├── invalid.mlir            # diagnostic test (-verify-diagnostics)
+│   └── filecheck_directives.mlir  # directive demo: one input, four RUN pipelines (CHECK/CSE/CANON/ERR)
 └── broken/                     # intentionally-failing demos (NOT discovered by lit)
     ├── expects_muli.mlir       # Tutorial 2: a CHECK the pass can't satisfy
     └── undefined_var.mlir      # Tutorial 2: a use of an undefined variable
@@ -28,15 +29,15 @@ cd lit-and-filecheck/example
 ./run.sh
 ```
 
-Expected output (3/3 passing):
+Expected output (4/4 passing):
 
 ```
 >> Configuring (MLIR_DIR=.../llvm-project/build/lib/cmake/mlir, generator=Ninja)
 >> Building + running the 'check' target (this invokes llvm-lit)
--- Testing: 3 tests, 3 workers --
+-- Testing: 4 tests, 4 workers --
 ...
-Total Discovered Tests: 3
-  Passed: 3 (100.00%)
+Total Discovered Tests: 4
+  Passed: 4 (100.00%)
 ```
 
 `./run.sh configure` stops after generating `build/` and the lit config (handy
@@ -94,13 +95,14 @@ This **main-config + generated-site-config** split is the part that is truly
 standard across LLVM/MLIR — the names `lit.cfg.py` and `lit.site.cfg.py` are the
 conventional ones lit looks for.
 
-## The three tests, explained
+## The four tests, explained
 
 | File | RUN line | Teaches |
 |------|----------|---------|
 | `cse.mlir` | `mlir-opt %s -cse \| FileCheck %s` | `CHECK-LABEL`, `CHECK-NEXT`, captured variable `%[[RESULT:.*]]` reused to prove both returns share one value after CSE |
 | `canonicalize.mlir` | `mlir-opt %s -canonicalize \| FileCheck %s` | `CHECK-NOT` (the `arith.addi` must vanish when folding `x+0`) + a plain `CHECK` |
 | `invalid.mlir` | `mlir-opt %s -split-input-file -verify-diagnostics` | diagnostic testing with `expected-error @+1 {{...}}` and `// -----` sub-test separators — no FileCheck involved |
+| `filecheck_directives.mlir` | four pipelines: no pass, `-cse`, `-canonicalize`, and a `not mlir-opt … 2>&1` error path, each with its own `--check-prefix` (`CSE`, `CANON`, `ERR`) | the standard multi-prefix idiom; a deliberately loose default `CHECK` group that passes despite a wrong assertion (why `CHECK-LABEL` exists); labels + captures + `-SAME` + `-NOT` on real transformations; `not` to lock in the error path |
 
 ## Try it yourself
 
