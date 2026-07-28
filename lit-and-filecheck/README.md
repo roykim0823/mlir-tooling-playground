@@ -1036,36 +1036,20 @@ prebuilt binaries — it does **not** build LLVM. `./run.sh clean` removes the
 build directory; `./run.sh configure` stops after generating `build/` and the lit
 config.
 
-### Pointing run.sh at your LLVM
+### Pointing run.sh at your LLVM, and the lit runner
 
-`run.sh` finds MLIR automatically, in this order:
+Both of these are `run.sh`'s job, and they're documented next to the script in
+[`example/README.md`](example/README.md#using-a-different-llvmmlir). The short
+version:
 
-1. an explicit `MLIR_DIR` you export,
-2. a from-source build at `../../../externals/llvm-project/build`,
-3. whatever `llvm-config` on your `PATH` points at (e.g. Homebrew's `llvm@20`).
-
-Override it explicitly when needed:
-
-```bash
-MLIR_DIR=/path/to/your/llvm-build/lib/cmake/mlir ./run.sh
-# Homebrew:  MLIR_DIR=$(brew --prefix llvm@20)/lib/cmake/mlir ./run.sh
-```
-
-### About the lit runner
-
-A *from-source* LLVM build ships a runner named **`llvm-lit`**. An *installed*
-LLVM — Homebrew's `llvm@20` included — does **not**: it ships lit's engine but
-not the `llvm-lit` wrapper name.
-
-This is not a problem. The `lit` PyPI/Homebrew package is the same tool under a
-different name. Both `run.sh` and `scripts/try.sh` fall back automatically:
-
-1. use `llvm-lit` if on `PATH`, else
-2. use `lit` if on `PATH` (`brew install lit`), else
-3. bootstrap `lit` into a private `example/.lit-venv/` on first run.
-
-So a missing `llvm-lit` never blocks you. Set `LLVM_EXTERNAL_LIT=/path/to/lit`
-to force a specific runner.
+- `run.sh` finds MLIR automatically (an explicit `MLIR_DIR`, then a from-source
+  build at `../../../externals/llvm-project/build`, then `llvm-config` on your
+  `PATH`). Override with `MLIR_DIR=/path/to/lib/cmake/mlir ./run.sh`.
+- A missing `llvm-lit` never blocks you: an *installed* LLVM (Homebrew
+  included) doesn't ship it, so `run.sh` and `scripts/try.sh` fall back to the
+  `lit` package (`brew install lit`), bootstrapping it into a private
+  `example/.lit-venv/` on first run if needed. Set
+  `LLVM_EXTERNAL_LIT=/path/to/lit` to force a specific runner.
 
 ### Putting the tools on your PATH
 
@@ -1100,7 +1084,8 @@ llvm-lit not found
 ```
 
 This is expected, not an error — `run.sh`/`try.sh` fall back to `lit` (see
-[About the lit runner](#about-the-lit-runner)), so you can ignore it. If you
+[the section above](#pointing-runsh-at-your-llvm-and-the-lit-runner)), so you
+can ignore it. If you
 specifically want the literal `llvm-lit …` commands to work in your own shell,
 install `lit` and expose it under that name:
 

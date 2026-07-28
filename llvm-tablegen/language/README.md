@@ -334,8 +334,10 @@ Both `LOAD` and `STORE` end up with `hasSideFx = 1` and `Latency = 8`.
 
 > **Important:** Top-level `let` only overrides *inherited* fields. A field defined *directly* in the record body is **not** overridden by an outer `let`.
 
-### Flavor C — `let append` / `let prepend`, Not working!
-Concatenate instead of replace. Works for `list<T>`, `string`/`code`, and `dag`.
+### Flavor C — appending to a list (there is no `let append` / `let prepend`)
+You'll want to *concatenate* instead of replace. TableGen has no `let` flavor
+for that — the idiom is `!listconcat` with the extras passed as template
+parameters.
 
 ```tablegen
 // TableGen has no `let append`/`let prepend`. Use !listconcat — and because
@@ -368,7 +370,8 @@ def ADD : Inst {
 
 ### Try it yourself
 - Use a top-level `let isCall = true in { ... }` to mark a group of "instruction" records as calls.
-- Use `let append` to grow a `list<string> Predicates` across an inheritance chain.
+- Grow a `list<string> Predicates` across an inheritance chain using the
+  Flavor C idiom (extras as template parameters + `!listconcat`).
 
 ---
 

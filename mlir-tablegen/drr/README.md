@@ -151,4 +151,4 @@ The output is a set of `RewritePattern` structs plus a
 `populateWithGenerated(RewritePatternSet &)` function. To use it you `#include`
 the `.inc` into your pass and call `populateWithGenerated(patterns)` — compiled
 against `libMLIR` with your dialect registered. See the top-level
-[README](../README.md#building-a-real-dialect-the-mlir_tablegen-cmake-flow).
+[README](../README.md#capstone-building-a-real-dialect).

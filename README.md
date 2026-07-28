@@ -26,21 +26,11 @@ capstone additionally links against `libMLIR`.
 ## Contents
 
 - [`llvm-tablegen/`](llvm-tablegen) — LLVM's `llvm-tblgen`, in two parts:
-  - [`language/`](llvm-tablegen/language) — the TableGen language, from first records to generating C++ from `.td` files.
-  - [`backend/`](llvm-tablegen/backend) — writing your own TableGen backend in C++ (RecordKeeper, the `Init` hierarchy, emitting + errors, `--gen-*` registration) plus driving a real `--gen-searchable-tables` backend.
+  - [`language/`](llvm-tablegen/language) — the TableGen language, from first records to generating C++ from `.td` files. 16 lessons, worked solutions in `solution/01`–`15`.
+  - [`backend/`](llvm-tablegen/backend) — writing your own TableGen backend in C++ (RecordKeeper, the `Init` hierarchy, emitting + errors, `--gen-*` registration) plus driving a real `--gen-searchable-tables` backend. 6 lessons (`1-entry-point/` → `6-searchable-tables/`), each a self-contained C++ backend.
 - [`mlir-tablegen/`](mlir-tablegen) — MLIR's `mlir-tblgen` workflows:
-  - [`ods/`](mlir-tablegen/ods) — **ODS**: defining operations (operands, results, traits, assembly format, builders, enums).
-  - [`attrs-and-types/`](mlir-tablegen/attrs-and-types) — defining custom attributes & types (`AttrDef` / `TypeDef`).
-  - [`drr/`](mlir-tablegen/drr) — **DRR**: declarative rewrite rules (source→result patterns, `NativeCodeCall`, directives).
-  - [`capstone-toy/`](mlir-tablegen/capstone-toy) — a complete, buildable out-of-tree Toy dialect linking everything above against `libMLIR`.
-- [`lit-and-filecheck/`](lit-and-filecheck) — testing LLVM/MLIR tools with `lit` and `FileCheck`, plus a runnable example test suite.
-
-## Progress so far
-
-- ✅ **`llvm-tablegen/language/`** — 16 lessons across `1-basics/` → `4-codegen/`.
-- ✅ **`llvm-tablegen/backend/`** — 5 lessons, each a self-contained C++ backend (`1-entry-point/` → `5-registration/`).
-- ✅ **`mlir-tablegen/ods/`** — operation definition, 6 lesson groups (`1-dialect-and-ops/` → `6-enums/`).
-- ✅ **`mlir-tablegen/attrs-and-types/`** — custom attrs & types, 10 lessons across 5 groups.
-- ✅ **`mlir-tablegen/drr/`** — declarative rewrite rules, 5 lessons (`1-basics/` → `5-directives/`).
-- ✅ **`mlir-tablegen/capstone-toy/`** — buildable Toy dialect wiring ODS + DRR through nine `mlir-tblgen` backends.
-- ✅ **`lit-and-filecheck/`** — a single-README, 6-chapter tutorial plus a runnable `example/` lit test suite and a one-command `scripts/try.sh` runner.
+  - [`ods/`](mlir-tablegen/ods) — **ODS**: defining operations (operands, results, traits, assembly format, builders, enums). 12 lessons in 6 groups (`1-dialect-and-ops/` → `6-enums/`).
+  - [`attrs-and-types/`](mlir-tablegen/attrs-and-types) — defining custom attributes & types (`AttrDef` / `TypeDef`). 10 lessons in 5 groups.
+  - [`drr/`](mlir-tablegen/drr) — **DRR**: declarative rewrite rules (source→result patterns, `NativeCodeCall`, directives). 5 lessons (`1-basics/` → `5-directives/`).
+  - [`capstone-toy/`](mlir-tablegen/capstone-toy) — a complete, buildable out-of-tree Toy dialect linking everything above against `libMLIR` through nine `mlir-tblgen` backends.
+- [`lit-and-filecheck/`](lit-and-filecheck) — testing LLVM/MLIR tools with `lit` and `FileCheck`: a 6-chapter tutorial, a runnable `example/` lit test suite, and a one-command `scripts/try.sh` runner.

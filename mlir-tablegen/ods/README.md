@@ -587,5 +587,5 @@ $MLIR/bin/mlir-tblgen --gen-op-defs -I $MLIR/include \
 Consuming the output for real means `#include`-ing it into a dialect library and
 compiling against `libMLIR` (you need a registered dialect + `MLIRContext`),
 which is heavier than a standalone demo — see the top-level
-[README](../README.md#building-a-real-dialect-the-mlir_tablegen-cmake-flow) for
+[README](../README.md#capstone-building-a-real-dialect) for
 the standard `mlir_tablegen()` CMake flow.

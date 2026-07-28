@@ -79,13 +79,14 @@ ls /opt/homebrew/opt/llvm@20/include/mlir/IR/OpBase.td   # the base ODS include
 
 ## Generating the C++
 
-`./gen-all.sh` runs the right backend for every lesson and writes the output
-under `generated/`, mirroring the source tree (ODS files emit `.decls.inc` +
-`.defs.inc`; DRR files emit `.rewriters.inc`):
+`./gen-all.sh` runs the right backend(s) for every lesson and writes the output
+under `generated/`, mirroring the source tree. Each backend gets its own suffix:
+`.op-decls.inc`/`.op-defs.inc` for ops, `.rewriters.inc` for DRR, and matching
+`attrdef-`/`typedef-`/`enum-`/`dialect-` variants for the rest:
 
 ```bash
 ./gen-all.sh
-# ods/2-arguments/03_operands.td  --gen-op-decls->  generated/ods/2-arguments/03_operands.decls.inc
+# ods/2-arguments/03_operands.td   --gen-op-decls->  generated/ods/2-arguments/03_operands.op-decls.inc
 # drr/1-basics/01_basic_pattern.td --gen-rewriters-> generated/drr/1-basics/01_basic_pattern.rewriters.inc
 # ...
 ```
@@ -101,7 +102,7 @@ $MLIR/bin/mlir-tblgen --gen-rewriters -I $MLIR/include drr/1-basics/01_basic_pat
 > The `mlir-tblgen` path is set at the top of `gen-all.sh` (Homebrew `llvm@20`
 > by default) — edit it if your install differs.
 
-## Capstone: building a real dialect — [`capstone-toy/`](capstone-toy)
+## Capstone: building a real dialect
 
 The lessons above only *generate* C++. The **[`capstone-toy/`](capstone-toy/README.md)**
 directory goes all the way: a complete, **buildable** out-of-tree dialect that
@@ -134,7 +135,9 @@ add_mlir_dialect_library(MLIRToy lib/ToyDialect.cpp lib/ToyPatterns.cpp
                          DEPENDS ToyIncGen LINK_LIBS PUBLIC MLIRIR MLIRSupport)
 ```
 
-The `-gen-*` flags are exactly the ones `gen-all.sh` runs here; `mlir_tablegen()`
+(The snippet is abridged — the real `CMakeLists.txt` runs all **nine** backends,
+adding the `typedef`/`attrdef` pairs for the custom type and attribute.) The
+`-gen-*` flags are the same ones `gen-all.sh` runs ad hoc; `mlir_tablegen()`
 just plugs them into the build graph and re-runs them when a `.td` changes. See
 [`capstone-toy/README.md`](capstone-toy/README.md) for the full walkthrough.
 
