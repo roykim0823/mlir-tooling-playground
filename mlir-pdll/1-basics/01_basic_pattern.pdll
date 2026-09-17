@@ -1,0 +1,38 @@
+//===- 01_basic_pattern.pdll - Lesson 1: a first PDLL pattern ---------------===//
+//
+// The same two rewrites as ../../mlir-tablegen/drr/1-basics/01_basic_pattern.td,
+// written in PDLL. No ODS is included here, so ops are matched purely by name.
+//
+//   mlir-pdll -x=mlir 01_basic_pattern.pdll     # the PDL dialect IR it compiles to
+//   mlir-pdll -x=cpp  01_basic_pattern.pdll     # C++ that embeds that IR
+//   mlir-pdll -x=ast  01_basic_pattern.pdll     # the parsed AST
+//
+//===----------------------------------------------------------------------------===//
+
+// A Pattern has a MATCH section (everything before the rewrite statement) and a
+// REWRITE section (the `replace`/`rewrite`/`erase` statement). The op bound to
+// `root` is the one the pattern is anchored on; every other matched op must be
+// reachable from it through operands.
+//
+// DRR:  def : Pat<(AddOp (MulOp $a, $b), $c), (FmaOp $a, $b, $c)>;
+Pattern FuseMulAdd {
+  // `op<toy.mul>(...)` matches an op by name. Each `name: Value` declares a new
+  // variable bound to that operand.
+  let mul = op<toy.mul>(a: Value, b: Value);
+
+  // Without ODS, `mul` used as an operand means "all results of mul" (a range).
+  let root = op<toy.add>(mul, c: Value);
+
+  // `replace X with Y`: build Y and replace all uses of X's results with it.
+  // No result types are written for toy.fma: when a new op directly replaces
+  // the root, PDL infers its result types from the root.
+  replace root with op<toy.fma>(a, b, c);
+}
+
+// Reusing a variable name twice in a match means "must be the same SSA value".
+//
+// DRR:  def : Pat<(AddOp $x, $x), (MulTwoOp $x)>;
+Pattern AddSelf {
+  let root = op<toy.add>(x: Value, x);
+  replace root with op<toy.mul_two>(x);
+}

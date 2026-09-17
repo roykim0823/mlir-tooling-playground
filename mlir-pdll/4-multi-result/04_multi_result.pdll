@@ -1,0 +1,61 @@
+//===- 04_multi_result.pdll - Lesson 4: multiple results, auxiliary ops, erase -===//
+//
+// Mirrors ../../mlir-tablegen/drr/4-multi-result-and-aux/04_multi_and_aux.td.
+//
+//   mlir-pdll -x=mlir -I $MLIR/include -I .. 04_multi_result.pdll
+//
+//===----------------------------------------------------------------------------===//
+
+#include "ToyOps.td"
+
+// Split a 2-result op into two 1-result ops. `-> (q: Type, r: Type)` binds the
+// root's result types so the new ops can reuse them. `replace root with (a, b)`
+// replaces result #0 with a and result #1 with b.
+//
+// DRR:  def : Pattern<(DivModOp $a, $b), [(DivOp $a, $b), (RemOp $a, $b)]>;
+Pattern SplitDivMod {
+  let root = op<toy.divmod>(a: Value, b: Value) -> (q: Type, r: Type);
+  rewrite root with {
+    let div = op<toy.div>(a, b) -> (q);
+    let rem = op<toy.rem>(a, b) -> (r);
+    replace root with (div, rem);
+  };
+}
+
+// An AUXILIARY op: build a multi-result op in the rewrite and use one result of
+// it. With ODS included the results are addressable by name (`dm.r`).
+// Result types of an op that is *not* the direct replacement must be given.
+//
+// DRR:  def : Pattern<(UseOp $x), [(DivModOp:$dm $x, $x), (UseOp $dm__1)]>;
+Pattern UseRemainder {
+  let root = op<toy.use>(x: Value);
+  rewrite root with {
+    let dm = op<toy.divmod>(x, x) -> (type<"i64">, type<"i64">);
+    replace root with op<toy.use>(dm.r);
+  };
+}
+
+// ERASE: remove the root outright. Only legal when nothing uses its results,
+// so guard it with a constraint.
+Constraint HasNoUses(v: Value) [{ return success(v.use_empty()); }];
+
+Pattern EraseDeadDiv {
+  let root = op<toy.div>;         // any toy.div, operands unconstrained
+  HasNoUses(root.q);
+  erase root;
+}
+
+// A SIDE-EFFECT-ONLY native rewrite (DRR: NativeCodeCallVoid in the
+// supplemental list). Declared external; returns nothing.
+//
+// DRR:  def CopyAttrs : NativeCodeCallVoid<"copyAttrs($0, $1)">;
+Rewrite CopyAttrs(from: Op, to: Op);
+
+Pattern DivToRemKeepAttrs {
+  let root = op<toy.div>(a: Value, b: Value) -> (t: Type);
+  rewrite root with {
+    let rem = op<toy.rem>(a, b) -> (t);
+    CopyAttrs(root, rem);
+    replace root with rem;
+  };
+}

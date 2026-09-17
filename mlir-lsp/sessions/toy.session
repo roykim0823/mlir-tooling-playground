@@ -1,0 +1,20 @@
+// The same kind of session, for the capstone's toy-lsp-server. Two documents:
+// good.mlir (hover + definition work on toy ops) and bad.mlir (a Toy verifier
+// error becomes a diagnostic). Feed this to the STOCK mlir-lsp-server to see
+// what an editor shows for a dialect the server does not know.
+{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"processId":1,"rootUri":null,"capabilities":{}}}
+// -----
+{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"test:///good.mlir","languageId":"mlir","version":1,"text":"func.func @f(%x: f64) -> f64 {\n  %c = toy.constant 2.0\n  %m = toy.mul %x, %c\n  return %m : f64\n}\n"}}}
+// -----
+// hover on `toy.constant` (line 1, col 12)
+{"jsonrpc":"2.0","id":1,"method":"textDocument/hover","params":{"textDocument":{"uri":"test:///good.mlir"},"position":{"line":1,"character":12}}}
+// -----
+// definition of %c from its use in toy.mul (line 2, col 20)
+{"jsonrpc":"2.0","id":2,"method":"textDocument/definition","params":{"textDocument":{"uri":"test:///good.mlir"},"position":{"line":2,"character":20}}}
+// -----
+// a toy.add with i32 operands: the ODS verifier's message, at the op's range
+{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"test:///bad.mlir","languageId":"mlir","version":1,"text":"func.func @g(%a: i32, %b: i32) -> f64 {\n  %0 = \"toy.add\"(%a, %b) : (i32, i32) -> f64\n  return %0 : f64\n}\n"}}}
+// -----
+{"jsonrpc":"2.0","id":99,"method":"shutdown"}
+// -----
+{"jsonrpc":"2.0","method":"exit"}

@@ -13,7 +13,10 @@ TableGen DAGs, and `mlir-tblgen --gen-rewriters` turns each rule into a C++
 DRR is sugar — it emits the same `OpRewritePattern` C++ you could hand-write.
 When a transform needs real logic, you escape to C++ via `NativeCodeCall`
 (Lesson 3); for anything DRR can't express (regions, complex matching), you drop
-to a hand-written pattern or PDL.
+to a hand-written pattern or PDL. MLIR's own pattern language, **PDLL**, sits
+between the two — every lesson here has a PDLL twin in
+[`../../mlir-pdll/`](../../mlir-pdll/README.md), which ends with a DRR-vs-PDLL
+comparison.
 
 ## Table of Contents
 

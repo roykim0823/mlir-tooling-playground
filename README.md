@@ -1,125 +1,123 @@
 # mlir-tooling-playground
 
-Hands-on tutorials for the LLVM/MLIR developer toolchain, learned by example:
-the **`lit`** + **`FileCheck`** testing stack, **LLVM TableGen** (the language
-and `llvm-tblgen` backends), and **MLIR TableGen** (ODS — Operation Definition
-Specification — and DRR — Declarative Rewrite Rules — driven by `mlir-tblgen`).
+Hands-on tutorials for the developer tooling around LLVM and MLIR: TableGen
+and its backends, the pattern languages, passes and interfaces, `lit` and
+`FileCheck`, and the tools you meet once you have a dialect of your own
+(`*-opt`, plugins, reducers, translators, language servers, CMake). Every
+topic is taught from small artifacts you can run, with the expected output
+next to the command, and everything meets in one buildable out-of-tree
+dialect.
 
-## Purpose
+The official docs describe each of these pieces well in isolation. What they
+rarely show is the pieces working together, end to end, on something small
+enough to read in one sitting. That is the gap this repository fills.
 
-LLVM and MLIR are built on a layer of *developer tooling* that the official docs
-describe well in isolation but rarely show working end-to-end. The goal of this
-repo is to close that gap: each topic is taught through small, **runnable**
-artifacts — a test you run with `lit`, a `.td` file you actually feed to
-`llvm-tblgen`/`mlir-tblgen`, a backend you compile — with the expected output
-shown right next to it.
+**Who it is for:** anyone building an out-of-tree LLVM/MLIR project who wants
+a worked reference rather than a specification. Familiarity with C++ and the
+idea of a compiler IR is assumed; MLIR itself is not.
 
-## What's covered
+## Start here
 
-### lit & FileCheck — how LLVM/MLIR tools are tested
+Read the tracks in this order. Each one stands on the previous ones and says
+so at the top; each has a one-command runner (`try.sh` or `gen-all.sh`) that
+replays every example in its README.
 
-Almost every regression test in LLVM and MLIR is a single source file that
-carries *both* the command to run and the expected output, written as comments.
-Two tools make that work, and [`lit-and-filecheck/`](lit-and-filecheck) covers
-both:
+| Step | Track | You learn | Needs |
+|---|---|---|---|
+| 1 | [`lit-and-filecheck/`](lit-and-filecheck) | how every LLVM/MLIR test works: `RUN:` lines, `CHECK:` directives, diagnostics tests, `split-file`, custom substitutions | stock `mlir-opt` |
+| 2 | [`llvm-tablegen/language/`](llvm-tablegen/language) | the TableGen language: records, classes, `let`, bang operators, `multiclass`, DAGs | `llvm-tblgen` |
+| 3 | [`llvm-tablegen/backend/`](llvm-tablegen/backend) | writing a TableGen backend in C++: `RecordKeeper`, `Init`, emitting, `--gen-*` registration | LLVM dev libraries |
+| 4 | [`mlir-tablegen/ods/`](mlir-tablegen/ods), [`attrs-and-types/`](mlir-tablegen/attrs-and-types) | defining ops, attributes and types with ODS | `mlir-tblgen` |
+| 5 | [`mlir-tablegen/drr/`](mlir-tablegen/drr), then [`mlir-pdll/`](mlir-pdll) | rewriting IR: TableGen DRR, then the same rewrites in PDLL, and when to use which | `mlir-tblgen`, `mlir-pdll` |
+| 6 | [`mlir-tablegen/passes/`](mlir-tablegen/passes), [`interfaces/`](mlir-tablegen/interfaces), [`docs/`](mlir-tablegen/docs) | declaring passes, defining your own interfaces, generating reference docs | `mlir-tblgen` |
+| 7 | [`mlir-tablegen/capstone-toy/`](mlir-tablegen/capstone-toy) | all of the above compiled into one dialect library with `toy-opt`, a plugin for stock `mlir-opt`, and a lit suite | `libMLIR`, CMake |
+| 8 | [`mlir-debugging/`](mlir-debugging) | the flags that show what a pass pipeline is doing, and what needs an assertions build | stock `mlir-opt` |
+| 9 | [`mlir-reduce/`](mlir-reduce) | shrinking a failing input with `mlir-reduce` and `llvm-reduce` | stock tools, capstone for `toy-reduce` |
+| 10 | [`mlir-translate/`](mlir-translate) | importing and exporting non-MLIR formats; `toy-translate` | stock tool, capstone |
+| 11 | [`mlir-lsp/`](mlir-lsp) | the three language servers, driven by hand and wired into an editor; `toy-lsp-server` | stock servers, capstone |
+| 12 | [`mlir-cmake/`](mlir-cmake) | what the CMake helpers expand to; a copyable skeleton project; the upstream template | CMake |
 
-- **`lit`** (the LLVM Integrated Tester) is the test *runner*. It discovers test
-  files under a directory, reads the `// RUN:` lines embedded in each one,
-  substitutes placeholders such as `%s` (the test file's path), executes the
-  resulting shell pipeline, and reports PASS/FAIL. It knows nothing about
-  compilers or IR; it only runs commands and checks exit codes. The tutorial
-  covers `lit.cfg.py` / `lit.site.cfg.py` configuration, suite discovery,
-  substitutions, `REQUIRES` / `XFAIL`, and reading lit's output when a test
-  fails.
-- **`FileCheck`** is the output *pattern matcher* that those `RUN` lines pipe
-  into. It re-reads the test file for `// CHECK:` lines and verifies they appear,
-  in order, in the text on stdin. The tutorial works through the directive
-  family (`CHECK-NEXT`, `CHECK-SAME`, `CHECK-LABEL`, `CHECK-NOT`, `CHECK-DAG`,
-  `CHECK-EMPTY`, `CHECK-COUNT`), regex patterns `{{...}}`, and pattern variables
-  `[[NAME:...]]` / `[[NAME]]` for capturing SSA names that differ from run to
-  run, plus check prefixes for sharing one file across several pipelines.
-- **MLIR testing conventions** — how a real `.mlir` test drives `mlir-opt` with
-  a single pass (`-cse`, `-canonicalize`, …) so failures have exactly one cause,
-  how to structure `CHECK-LABEL` per function, and how to write a new test from
-  scratch.
+Steps 1 and 8 need nothing but a prebuilt LLVM/MLIR and can be read on their
+own. Steps 9 to 12 refer back to the capstone for the "your own dialect"
+half of each topic, so build it (step 7) before them.
 
-Everything runs against a small standalone CMake project in
-[`example/`](lit-and-filecheck/example) using stock `mlir-opt` and `FileCheck`,
-so the only prerequisite is a prebuilt LLVM/MLIR. A one-command runner
-(`scripts/try.sh`) lets you execute any tutorial step directly.
+## The tracks in one paragraph each
 
-### TableGen — LLVM's declarative description language
+**Testing.** `lit` finds test files and runs the shell commands written inside
+them; `FileCheck` checks a tool's output against `CHECK:` lines in the same
+file. The [`lit-and-filecheck/`](lit-and-filecheck) tutorial builds up every
+directive on a standalone CMake project that tests stock `mlir-opt`, then adds
+diagnostics tests, multi-input files, custom substitutions and the checks
+generator. The capstone reuses the exact wiring for its own tools.
 
-**TableGen** is the language behind most of LLVM's and MLIR's generated code.
-You write *records* in `.td` files and a *backend* turns them into C++. The
-language is shared, but LLVM and MLIR use it for very different jobs and ship
-different tools, so the two get separate tracks.
+**TableGen, LLVM side.** TableGen is the declarative language behind most
+generated code in LLVM and MLIR: records in `.td` files, a backend that turns
+them into C++. [`llvm-tablegen/`](llvm-tablegen) teaches the language with
+`llvm-tblgen` and then the other side, writing a backend, which is how the
+MLIR generators below are implemented.
 
-**LLVM TableGen** ([`llvm-tablegen/`](llvm-tablegen)) — the tool is
-`llvm-tblgen`. In LLVM proper, TableGen is used for *target codegen*: instruction,
-register, scheduling, and intrinsic descriptions, and SelectionDAG
-instruction-selection patterns. Core IR is hand-written C++. This track teaches
-the language and the tool itself, independent of any target:
+**TableGen, MLIR side.** MLIR uses TableGen for its core, not its edges:
+every dialect is defined this way. [`mlir-tablegen/`](mlir-tablegen) covers
+ODS for ops, attributes and types; DRR for rewrite patterns; pass
+declarations; interfaces; and the documentation backends. Each lesson is a
+standalone `.td` file you feed to `mlir-tblgen`, with the generated C++
+explained.
 
-- **The language** (`language/`) — records, classes, template arguments, `let`,
-  bang operators, `multiclass`, DAGs, and running the stock `--gen-*` backends
-  of `llvm-tblgen`. This is the foundation the MLIR track builds on.
-- **Backends** (`backend/`) — what happens on the other side of `--gen-*`:
-  walking the `RecordKeeper` / `Record` / `Init` data model in C++, emitting
-  code, reporting errors, and registering a new backend. This is how the ODS and
-  DRR generators below are implemented under the hood.
+**Patterns beyond TableGen.** [`mlir-pdll/`](mlir-pdll) is PDLL, MLIR's own
+pattern language, taught as a twin of the DRR lessons so the two can be read
+side by side. It compiles to PDL, a dialect of IR that describes patterns.
 
-**MLIR TableGen** ([`mlir-tablegen/`](mlir-tablegen)) — the tool is
-`mlir-tblgen`, the same TableGen frontend with an MLIR-specific set of backends.
-Where LLVM uses TableGen at the edges, MLIR uses it at the core: *every* dialect,
-including the built-in ones, is defined declaratively. Two workflows dominate:
+**The capstone.** [`mlir-tablegen/capstone-toy/`](mlir-tablegen/capstone-toy)
+is a complete out-of-tree dialect: ops, a type, an attribute, two interfaces,
+patterns in DRR, PDLL and C++, a pass, and five tools built from MLIR's
+`*Main` libraries (`toy-opt`, `toy-reduce`, `toy-translate`,
+`toy-lsp-server`, a driver). A plugin loads the same dialect and pass into the
+stock `mlir-opt`. Its lit suite drives all of them.
 
-- **ODS — Operation Definition Specification** (`ods/`) — MLIR's way to
-  *define* operations. You describe an op declaratively (its operands, results,
-  attributes, regions, traits, verifier, assembly format, builders, enums) and
-  `mlir-tblgen --gen-op-decls/-defs` emits the C++ op class: accessors,
-  builders, verifier, parser and printer. ODS is the MLIR analog of LLVM's
-  instruction descriptions.
-- **Attributes & types** (`attrs-and-types/`) — the ODS counterpart for a
-  dialect's own compile-time values (`#toy.shape<3 x 4>`) and types
-  (`!toy.int<32>`): `AttrDef` / `TypeDef`, parameters, assembly format,
-  builders, verification, and traits/interfaces, generated via
-  `--gen-attrdef-*` / `--gen-typedef-*`.
-- **DRR — Declarative Rewrite Rules** (`drr/`) — MLIR's way to *rewrite* IR.
-  You write a source pattern (the IR to match) and a result pattern (the IR to
-  build) as TableGen DAGs, and `mlir-tblgen --gen-rewriters` turns each into a
-  C++ `RewritePattern`. DRR builds directly on ODS: the DAG operators in a
-  pattern *are* the ops you defined. Covers constraints, `NativeCodeCall`
-  escapes to C++, multi-result and auxiliary ops, and rewrite directives. DRR is
-  the MLIR analog of LLVM's SelectionDAG ISel patterns.
-- **Capstone: an out-of-tree Toy dialect** (`capstone-toy/`) — ties ODS,
-  attributes/types, and DRR together into a single `.td` that nine `mlir-tblgen`
-  backends turn into a real dialect library, compiled and linked against
-  `libMLIR` with CMake, plus a driver that builds IR, applies the rewrite, and
-  prints the result.
+**Tooling around a dialect.** Four short tracks cover what you reach for once
+the dialect exists: [`mlir-debugging/`](mlir-debugging) for looking inside a
+run, [`mlir-reduce/`](mlir-reduce) for shrinking a failing input,
+[`mlir-translate/`](mlir-translate) for getting IR in and out of other
+formats, and [`mlir-lsp/`](mlir-lsp) for editor support. Each shows the stock
+tool first and then the capstone's own version of it.
 
-### Suggested order
+**Build system.** [`mlir-cmake/`](mlir-cmake) explains the CMake helpers all
+of this rests on, from their source, and ships a minimal project in the
+upstream layout that you can copy.
 
-The `lit` / `FileCheck` track is self-contained and is the quickest way to see
-the toolchain in action, so it comes first. The TableGen tracks form a
-progression: start by *using* TableGen (writing `.td`, running stock
-`llvm-tblgen` backends), then learn to *extend* it (writing your own backend in
-C++), then move to MLIR's ODS and DRR workflows, and finally tie it together in
-a **buildable** out-of-tree dialect.
+## Prerequisites and conventions
 
-**Who it's for:** anyone building an out-of-tree LLVM/MLIR project (a new
-dialect, a custom backend, a pass) who wants a worked reference rather than a
-spec. Most lessons only need an LLVM/MLIR install (`brew install llvm@20`); the
-capstone additionally links against `libMLIR`.
+- **LLVM/MLIR 20.** Everything was written and verified against Homebrew's
+  `llvm@20` on macOS (`brew install llvm@20`); paths in the docs use
+  `/opt/homebrew/opt/llvm@20`. Any LLVM 20 install with CMake files works;
+  set `MLIR_DIR` or `LLVM_BIN` where a script asks for it.
+- **A `lit` runner.** Installed LLVMs ship no `llvm-lit`; `pip install lit`
+  provides one, and the CMake files find it on `PATH`.
+- **Release builds.** Homebrew's LLVM has assertions off. Two features are
+  compiled out and the docs say so where it matters: `-debug-only` and pass
+  statistics.
+- **Shell.** The command lines are plain POSIX shell and were run under both
+  bash and zsh. Scripts are bash.
+- **Generated output** (`generated/`, `build/`) is git-ignored; regenerate it
+  with the track's `gen-all.sh` or the capstone's CMake build.
 
-## Contents
+## Repository map
 
-- [`lit-and-filecheck/`](lit-and-filecheck) — testing LLVM/MLIR tools with `lit` and `FileCheck`: a 6-chapter tutorial, a runnable `example/` lit test suite, and a one-command `scripts/try.sh` runner.
-- [`llvm-tablegen/`](llvm-tablegen) — LLVM's `llvm-tblgen`, in two parts:
-  - [`language/`](llvm-tablegen/language) — the TableGen language, from first records to generating C++ from `.td` files. 16 lessons, worked solutions in `solution/01`–`15`.
-  - [`backend/`](llvm-tablegen/backend) — writing your own TableGen backend in C++ (RecordKeeper, the `Init` hierarchy, emitting + errors, `--gen-*` registration) plus driving a real `--gen-searchable-tables` backend. 6 lessons (`1-entry-point/` → `6-searchable-tables/`), each a self-contained C++ backend.
-- [`mlir-tablegen/`](mlir-tablegen) — MLIR's `mlir-tblgen` workflows:
-  - [`ods/`](mlir-tablegen/ods) — **ODS**: defining operations (operands, results, traits, assembly format, builders, enums). 12 lessons in 6 groups (`1-dialect-and-ops/` → `6-enums/`).
-  - [`attrs-and-types/`](mlir-tablegen/attrs-and-types) — defining custom attributes & types (`AttrDef` / `TypeDef`). 10 lessons in 5 groups.
-  - [`drr/`](mlir-tablegen/drr) — **DRR**: declarative rewrite rules (source→result patterns, `NativeCodeCall`, directives). 5 lessons (`1-basics/` → `5-directives/`).
-  - [`capstone-toy/`](mlir-tablegen/capstone-toy) — a complete, buildable out-of-tree Toy dialect linking everything above against `libMLIR` through nine `mlir-tblgen` backends.
+```
+lit-and-filecheck/      tutorial, example/ (standalone lit project), scripts/try.sh
+llvm-tablegen/
+  language/             16 lessons + solutions, gen-all.sh
+  backend/              6 C++ backends, run-all.sh
+mlir-tablegen/          gen-all.sh runs every lesson below
+  ods/                  12 lessons        attrs-and-types/   10 lessons
+  drr/                   5 lessons        passes/             3 lessons
+  interfaces/            3 lessons        docs/               1 lesson
+  capstone-toy/         the buildable dialect: include/ lib/ tools/ test/
+mlir-pdll/              5 lessons mirroring drr/, gen-all.sh
+mlir-debugging/         examples/, try.sh
+mlir-reduce/            examples/, try.sh
+mlir-translate/         examples/, try.sh
+mlir-lsp/               sessions/, make-session.py, summarize.py, try.sh
+mlir-cmake/             skeleton/ (copyable project), try.sh
+.vscode/settings.json   language servers wired for this repo
+```

@@ -198,6 +198,8 @@ def Toy_FixedType : TypeDef<Toy_Dialect, "Fixed"> {
 
 ## Lesson 9 — Traits and interfaces
 
+> This lesson *uses* MLIR's built-in traits and interfaces. To *define* your own interface, see [`../interfaces/`](../interfaces/README.md).
+
 *Source: `5-traits-interfaces-extras/09_traits_interfaces.td`*
 
 Attributes/types can carry traits and interfaces in their trait list (the third

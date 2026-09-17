@@ -3,9 +3,9 @@
 #
 #   scripts/try.sh            # run every section, in order (same as 'all')
 #   scripts/try.sh all
-#   scripts/try.sh 3          # run just one section  (1..6; leading zero ok)
+#   scripts/try.sh 3          # run just one section  (1..7; leading zero ok)
 #
-# Sections 1-6 mirror Tutorials 1-6 in ../README.md. Each command is echoed
+# Sections 1-7 mirror Tutorials 1-7 in ../README.md. Each command is echoed
 # before it runs, so the output reads like a transcript. Override the toolchain
 # with:  LLVM_BIN=/path/to/llvm-build/bin scripts/try.sh
 #
@@ -220,8 +220,11 @@ EOF
   run "./run.sh"
 
   section "Step 2 — draft exhaustive checks with generate-test-checks.py"
-  local gtc="/tmp/generate-test-checks.py"
+  # The repo carries a copy (scripts/generate-test-checks.py, from llvmorg-20.1.8);
+  # fall back to downloading upstream only if it is somehow missing.
+  local gtc="$SCRIPTS_DIR/generate-test-checks.py"
   if [[ ! -f "$gtc" ]]; then
+    gtc="/tmp/generate-test-checks.py"
     echo ">> fetching generate-test-checks.py (single self-contained script)…"
     curl -sLo "$gtc" \
       "https://raw.githubusercontent.com/llvm/llvm-project/release/20.x/mlir/utils/generate-test-checks.py" \
@@ -236,6 +239,21 @@ EOF
   echo; echo ">> Tutorial 6 examples complete."
 }
 
+chapter_07() {
+  cd "$EXAMPLE"
+  section "Tutorial 7 — split-file and custom substitutions"
+  section "Step 1 — split-file: three standalone parts in one test file"
+  run "grep -nE 'RUN:|^//---' test/split_file.mlir"
+  run "llvm-lit -v build/test --filter='split_file\\.mlir'"
+  run "ls build/test/Output/split_file.mlir.tmp/"
+  run "split-file test/split_file.mlir /tmp/split-demo && cat /tmp/split-demo/canon.mlir && rm -rf /tmp/split-demo"
+  section "Step 2 — %{name} substitutions defined in lit.cfg.py (nested via recursiveExpansionLimit)"
+  run "grep -nE 'substitutions.append|recursiveExpansionLimit' test/lit.cfg.py"
+  run "grep -n 'RUN:' test/custom_subst.mlir"
+  run "llvm-lit -a build/test --filter='custom_subst\\.mlir' | grep 'RUN: at line'"
+  echo; echo ">> Tutorial 7 examples complete."
+}
+
 run_chapter() {
   case "$1" in
     1|01) chapter_01 ;;
@@ -244,7 +262,8 @@ run_chapter() {
     4|04) chapter_04 ;;
     5|05) chapter_05 ;;
     6|06) chapter_06 ;;
-    *) echo "Unknown chapter: '$1' (expected 1..6 or 'all')" >&2; exit 2 ;;
+    7|07) chapter_07 ;;
+    *) echo "Unknown chapter: '$1' (expected 1..7 or 'all')" >&2; exit 2 ;;
   esac
 }
 
@@ -253,7 +272,7 @@ ensure_built
 
 target="${1:-all}"
 if [[ "$target" == "all" ]]; then
-  for n in 01 02 03 04 05 06; do
+  for n in 01 02 03 04 05 06 07; do
     echo
     echo "###################################################################"
     echo "###  Tutorial $n"

@@ -1,0 +1,3 @@
+# line 1: comment
+x = const 1.0
+y = add x nope

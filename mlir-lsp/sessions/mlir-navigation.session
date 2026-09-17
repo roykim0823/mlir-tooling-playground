@@ -1,0 +1,30 @@
+// Navigation requests on a VALID document. Positions are 0-based {line, character}.
+// The document:
+//   0 func.func @compute(%a: i32) -> i32 {
+//   1   %c1 = arith.constant 1 : i32
+//   2   %sum = arith.addi %a, %c1 : i32
+//   3   %prod = arith.muli %sum, %c1 : i32
+//   4   return %prod : i32
+//   5 }
+{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"processId":1,"rootUri":null,"capabilities":{}}}
+// -----
+{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"test:///nav.mlir","languageId":"mlir","version":1,"text":"func.func @compute(%a: i32) -> i32 {\n  %c1 = arith.constant 1 : i32\n  %sum = arith.addi %a, %c1 : i32\n  %prod = arith.muli %sum, %c1 : i32\n  return %prod : i32\n}\n"}}}
+// -----
+// hover on the op name `arith.addi` (line 2, col 12) -> its generic form
+{"jsonrpc":"2.0","id":1,"method":"textDocument/hover","params":{"textDocument":{"uri":"test:///nav.mlir"},"position":{"line":2,"character":12}}}
+// -----
+// hover on the USE of %sum (line 3, col 22) -> which op defines it, result #, type
+{"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":"test:///nav.mlir"},"position":{"line":3,"character":22}}}
+// -----
+// go-to-definition from that use -> the range where %sum is defined (line 2)
+{"jsonrpc":"2.0","id":3,"method":"textDocument/definition","params":{"textDocument":{"uri":"test:///nav.mlir"},"position":{"line":3,"character":22}}}
+// -----
+// find-references of %c1 (line 1, col 3) -> its definition + both uses
+{"jsonrpc":"2.0","id":4,"method":"textDocument/references","params":{"textDocument":{"uri":"test:///nav.mlir"},"position":{"line":1,"character":3},"context":{"includeDeclaration":true}}}
+// -----
+// document outline -> the symbols (functions) in the file
+{"jsonrpc":"2.0","id":5,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":"test:///nav.mlir"}}}
+// -----
+{"jsonrpc":"2.0","id":99,"method":"shutdown"}
+// -----
+{"jsonrpc":"2.0","method":"exit"}

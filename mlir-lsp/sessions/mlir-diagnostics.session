@@ -1,0 +1,21 @@
+// A JSON-RPC session for mlir-lsp-server, in the format its --lit-test mode
+// reads: one message per block, blocks separated by a line of five dashes.
+// Comment lines (//) are ignored. This is exactly how upstream tests drive the
+// server (mlir/test/mlir-lsp-server/*.test).
+//
+// 1. initialize: the client announces itself; the server replies with what it
+//    can do (capabilities).
+{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"processId":1,"rootUri":null,"capabilities":{}}}
+// -----
+// 2. didOpen: the client sends the WHOLE document text. The server parses it
+//    and answers with a publishDiagnostics notification. This document has a
+//    type error on line 3 (0-based): %b is i64 but used as i32.
+{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"test:///demo.mlir","languageId":"mlir","version":1,"text":"func.func @f(%a: i32, %b: i64) -> i32 {\n  %c = arith.constant 1 : i32\n  %0 = arith.addi %a, %c : i32\n  %1 = arith.addi %0, %b : i32\n  return %0 : i32\n}\n"}}}
+// -----
+// 3. didChange: the client fixes the document (full-text sync). Diagnostics
+//    are re-published — now empty.
+{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":"test:///demo.mlir","version":2},"contentChanges":[{"text":"func.func @f(%a: i32, %b: i32) -> i32 {\n  %c = arith.constant 1 : i32\n  %0 = arith.addi %a, %c : i32\n  %1 = arith.addi %0, %b : i32\n  return %1 : i32\n}\n"}]}}
+// -----
+{"jsonrpc":"2.0","id":99,"method":"shutdown"}
+// -----
+{"jsonrpc":"2.0","method":"exit"}

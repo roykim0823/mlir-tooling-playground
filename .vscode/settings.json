@@ -1,0 +1,27 @@
+// Editor integration for this repo (VS Code + the "MLIR" extension,
+// llvm-vs-code-extensions.vscode-mlir). See mlir-lsp/README.md.
+//
+// Paths assume Homebrew's llvm@20 and a built capstone (mlir-tablegen/capstone-toy/build).
+// Adjust the /opt/homebrew/opt/llvm@20 prefix to your install.
+{
+  // .mlir files: the STOCK server knows upstream dialects only. For the
+  // capstone's toy dialect point this at the capstone's own server instead:
+  //   "${workspaceFolder}/mlir-tablegen/capstone-toy/build/toy-lsp-server"
+  "mlir.server_path": "/opt/homebrew/opt/llvm@20/bin/mlir-lsp-server",
+
+  // .td files: the server needs include paths per file; CMake's mlir_tablegen()
+  // writes them to tablegen_compile_commands.yml in the build directory.
+  "mlir.tablegen_server_path": "/opt/homebrew/opt/llvm@20/bin/tblgen-lsp-server",
+  "mlir.tablegen_compilation_databases": [
+    "${workspaceFolder}/mlir-tablegen/capstone-toy/build/tablegen_compile_commands.yml"
+  ],
+
+  // .pdll files: same idea, written by add_mlir_pdll_library().
+  "mlir.pdll_server_path": "/opt/homebrew/opt/llvm@20/bin/mlir-pdll-lsp-server",
+  "mlir.pdll_compilation_databases": [
+    "${workspaceFolder}/mlir-tablegen/capstone-toy/build/pdll_compile_commands.yml"
+  ],
+
+  // Restart servers automatically when the settings above change.
+  "mlir.onSettingsChanged": "restart"
+}

@@ -16,7 +16,9 @@ example/
 │   ├── cse.mlir                # CHECK-LABEL, CHECK-NEXT, captured variable
 │   ├── canonicalize.mlir       # CHECK-NOT + plain CHECK
 │   ├── invalid.mlir            # diagnostic test (-verify-diagnostics)
-│   └── filecheck_directives.mlir  # directive demo: one input, four RUN pipelines (CHECK/CSE/CANON/ERR)
+│   ├── filecheck_directives.mlir  # directive demo: one input, four RUN pipelines (CHECK/CSE/CANON/ERR)
+│   ├── split_file.mlir         # three standalone inputs in one file via `split-file %s %t`
+│   └── custom_subst.mlir       # %{canon} / %{canon-generic} substitutions defined in lit.cfg.py
 └── broken/                     # intentionally-failing demos (NOT discovered by lit)
     ├── expects_muli.mlir       # Tutorial 2: a CHECK the pass can't satisfy
     └── undefined_var.mlir      # Tutorial 2: a use of an undefined variable
@@ -29,15 +31,15 @@ cd lit-and-filecheck/example
 ./run.sh
 ```
 
-Expected output (4/4 passing):
+Expected output (6/6 passing):
 
 ```
 >> Configuring (MLIR_DIR=.../llvm-project/build/lib/cmake/mlir, generator=Ninja)
 >> Building + running the 'check' target (this invokes llvm-lit)
--- Testing: 4 tests, 4 workers --
+-- Testing: 6 tests, 6 workers --
 ...
 Total Discovered Tests: 4
-  Passed: 4 (100.00%)
+  Passed: 6 (100.00%)
 ```
 
 `./run.sh configure` stops after generating `build/` and the lit config (handy
@@ -95,7 +97,7 @@ This **main-config + generated-site-config** split is the part that is truly
 standard across LLVM/MLIR — the names `lit.cfg.py` and `lit.site.cfg.py` are the
 conventional ones lit looks for.
 
-## The four tests, explained
+## The six tests, explained
 
 | File | RUN line | Teaches |
 |------|----------|---------|
@@ -103,11 +105,13 @@ conventional ones lit looks for.
 | `canonicalize.mlir` | `mlir-opt %s -canonicalize \| FileCheck %s` | `CHECK-NOT` (the `arith.addi` must vanish when folding `x+0`) + a plain `CHECK` |
 | `invalid.mlir` | `mlir-opt %s -split-input-file -verify-diagnostics` | diagnostic testing with `expected-error @+1 {{...}}` and `// -----` sub-test separators — no FileCheck involved |
 | `filecheck_directives.mlir` | four pipelines: no pass, `-cse`, `-canonicalize`, and a `not mlir-opt … 2>&1` error path, each with its own `--check-prefix` (`CSE`, `CANON`, `ERR`) | the standard multi-prefix idiom; a deliberately loose default `CHECK` group that passes despite a wrong assertion (why `CHECK-LABEL` exists); labels + captures + `-SAME` + `-NOT` on real transformations; `not` to lock in the error path |
+| `split_file.mlir` | `split-file %s %t`, then one pipeline per part (`%t/cse.mlir`, `%t/canon.mlir`, `not mlir-opt %t/bad.mlir`) | several standalone inputs — including one that must fail to parse — in a single test file (Tutorial 7) |
+| `custom_subst.mlir` | `%{canon} \| FileCheck %s` and the nested `%{canon-generic}` | suite-defined `%{name}` substitutions from `lit.cfg.py`, and `config.recursiveExpansionLimit` for nesting (Tutorial 7) |
 
 ## Try it yourself
 
 This project is the playground for the [tutorial one level up](../README.md):
-six hands-on tutorials that run a test, read failures, build up every FileCheck
+seven hands-on tutorials that run a test, read failures, build up every FileCheck
 directive, and write your own (`add_lit_testsuite` discovers any new `.mlir` by
 its suffix, so no CMake edit is needed — just re-run `./run.sh`).
 
@@ -128,4 +132,11 @@ test." In a real out-of-tree MLIR project you would build your own driver
 - write RUN lines as `// RUN: my-opt %s --your-pass | FileCheck %s`.
 
 Everything else — the two-config split, the `.mlir` tests, the directives —
-stays exactly the same.
+stays exactly the same. The [`mlir-cmake/`](../../mlir-cmake/README.md)
+chapter's `skeleton/` is a complete minimal project wired this way. (The other route — keep using stock `mlir-opt` and
+load your dialect into it with `--load-dialect-plugin` — is shown by the same
+capstone's `test/plugin.mlir`.) For a worked example, see
+[`../../mlir-tablegen/capstone-toy/`](../../mlir-tablegen/capstone-toy/README.md):
+its `CMakeLists.txt` builds a `toy-opt` and declares
+`add_lit_testsuite(check-toy ... DEPENDS toy-opt)`, and `test/lit.cfg.py`
+registers `toy-opt` as the tool substitution.

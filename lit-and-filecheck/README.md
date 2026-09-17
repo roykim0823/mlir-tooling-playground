@@ -48,6 +48,7 @@ Tutorials: [1 lit basics](#tutorial-1--lit-basics) ·
 [4 patterns & variables](#tutorial-4--patterns-and-variables) ·
 [5 MLIR conventions](#tutorial-5--mlir-testing-conventions) ·
 [6 write your own](#tutorial-6--write-your-own-test) ·
+[7 split-file & custom substitutions](#tutorial-7--split-file-and-custom-substitutions) ·
 [Cheat sheet](#cheat-sheet) ·
 [Appendix: setup & troubleshooting](#appendix-setup-and-troubleshooting)
 
@@ -61,7 +62,7 @@ cd example
 ./run.sh
 ```
 
-Expected tail: `Passed: 4 (100.00%)`.
+Expected tail: `Passed: 6 (100.00%)`.
 
 If `run.sh` can't find your LLVM, or you're on Homebrew and see "llvm-lit not
 found", that's normal and handled — see the
@@ -120,13 +121,13 @@ llvm-lit build/test
 ```
 
 ```
--- Testing: 4 tests, 4 workers --
+-- Testing: 6 tests, 6 workers --
 Testing Time: 0.26s
 Total Discovered Tests: 4
-  Passed: 4 (100.00%)
+  Passed: 6 (100.00%)
 ```
 
-lit found four tests, ran each, and all passed. That's the whole loop.
+lit found six tests, ran each, and all passed. That's the whole loop.
 
 ### Step 2 — see what lit discovered, and why
 
@@ -780,9 +781,15 @@ internalize:
 
 In a real out-of-tree project you swap `mlir-opt` for your own `my-opt` driver;
 the RUN/CHECK mechanics are identical (see
-[`example/README.md`](example/README.md) → "Turning this into a real project").
+[`example/README.md`](example/README.md) → "Turning this into a real project",
+and [`../mlir-tablegen/capstone-toy/test/`](../mlir-tablegen/capstone-toy) for a
+working suite that drives the out-of-tree `toy-opt` built in that directory).
 
 ### Diagnostic tests — `-verify-diagnostics`
+
+> The flags that control how diagnostics *look* when you are not testing them
+> (`--mlir-print-op-on-diagnostic`, `--mlir-print-stacktrace-on-diagnostic`,
+> verbosity) are in [`../mlir-debugging/`](../mlir-debugging/README.md), Section 4.
 
 These check that *invalid* input produces the *right* error. You annotate the IR
 with `expected-*` directives and pass `-verify-diagnostics`; the run passes when
@@ -829,6 +836,9 @@ The `{{...}}` is FileCheck-style regex *inside* the message, matched as a substr
 > **Gotcha:** `-split-input-file` splits on **any** line matching the five-dash
 > separator — including one buried in a prose `//` comment. Keep that separator
 > out of explanatory comments or you'll create a bogus extra sub-test.
+> (`-split-input-file` is an `mlir-opt` feature for diagnostics. To put several
+> standalone inputs for *any* tool in one file, use LLVM's `split-file` —
+> Tutorial 7.)
 
 > **Gotcha — unexpected notes:** if a test fails on `unexpected note:`, the
 > compiler emitted a standalone `note:` (e.g. `prior use here`) that you must also
@@ -886,7 +896,7 @@ EOF
 
 # Fast inner loop by hand, then the full suite picks it up automatically:
 mlir-opt test/double_negate.mlir -canonicalize | FileCheck test/double_negate.mlir && echo PASS
-./run.sh        # now reports 5 tests
+./run.sh        # now reports 7 tests
 ```
 
 You just used `CHECK-LABEL` (block boundary), `CHECK-NOT` (a pattern that must
@@ -896,9 +906,9 @@ You just used `CHECK-LABEL` (block boundary), `CHECK-NOT` (a pattern that must
 
 The checks above are *loose*: they pin down two facts and ignore everything
 else. Real MLIR lowering tests often pin down the **entire** output — every op,
-every operand, every SSA value captured and cross-referenced. Nobody writes 35
-lines of captures by hand. LLVM ships an authoring aid,
-`mlir/utils/generate-test-checks.py`, and it's worth being precise about how it
+every operand, every SSA value captured and cross-referenced. Writing 35
+lines of captures by hand is not realistic, so LLVM ships an authoring aid,
+`mlir/utils/generate-test-checks.py`. Be precise about how it
 relates to FileCheck, because the two are easy to conflate:
 
 - **FileCheck is a verifier that runs every time the test runs.** Input: the
@@ -914,17 +924,21 @@ So the division of labor is: the *script* writes a first draft once;
 *FileCheck* enforces it forever after.
 
 The script lives in LLVM's *source tree*, not in installed toolchains
-(Homebrew's `llvm@20` doesn't ship it). It's a single self-contained file:
+(Homebrew's `llvm@20` doesn't ship it). It is a single self-contained Python
+file, so this repo carries a copy at
+[`scripts/generate-test-checks.py`](scripts/generate-test-checks.py) (from the
+`llvmorg-20.1.8` tag, Apache-2.0 with LLVM exceptions, unmodified apart from a
+provenance note at the top). If you prefer the upstream file:
 
 ```bash
 curl -sLo /tmp/generate-test-checks.py \
   https://raw.githubusercontent.com/llvm/llvm-project/release/20.x/mlir/utils/generate-test-checks.py
 ```
 
-Feed it the pass output for the test from Step 1:
+Feed it the pass output for the test from Step 1 (from `example/`):
 
 ```bash
-mlir-opt test/double_negate.mlir -canonicalize | python3 /tmp/generate-test-checks.py
+mlir-opt test/double_negate.mlir -canonicalize | python3 ../scripts/generate-test-checks.py
 ```
 
 ```
@@ -943,7 +957,7 @@ mlir-opt test/double_negate.mlir -canonicalize | python3 /tmp/generate-test-chec
 
 Everything from Tutorials 3–4 is in the draft: a `CHECK-LABEL` on the
 signature, a `CHECK-SAME` continuation *carrying the argument capture* (a
-label can't hold captures — this is that rule in the wild), and `%[[VAL_0]]`
+label can't hold captures, so the script moved it to the next line), and `%[[VAL_0]]`
 reused to assert the returned value is the function's argument. The intended
 workflow is:
 
@@ -974,6 +988,114 @@ every change is intended.
 rm test/double_negate.mlir
 ```
 
+➡️ Next: [Tutorial 7 — split-file and custom substitutions](#tutorial-7--split-file-and-custom-substitutions)
+
+---
+
+## Tutorial 7 — split-file and custom substitutions
+
+Two lit features that upstream tests use constantly and that turn "one test =
+one file = one tool" into something more flexible. Both are wired into the
+example: `test/split_file.mlir` and `test/custom_subst.mlir`.
+
+### Step 1 — several standalone inputs in one file: `split-file`
+
+Sometimes a test wants *independent* inputs: three small modules that must be
+processed separately, or two valid cases next to one that must fail to
+parse. `-split-input-file` (Tutorial 5) only helps for diagnostics, and only
+inside `mlir-opt`. LLVM's **`split-file`** tool is the general answer: it cuts
+a file at `//--- NAME` markers and writes each part to a directory.
+
+```mlir
+// RUN: split-file %s %t
+// RUN: mlir-opt %t/cse.mlir -cse | FileCheck %t/cse.mlir
+// RUN: mlir-opt %t/canon.mlir -canonicalize | FileCheck %t/canon.mlir
+// RUN: not mlir-opt %t/bad.mlir 2>&1 | FileCheck %t/bad.mlir
+
+//--- cse.mlir
+// CHECK-LABEL: func.func @dup
+func.func @dup() -> (i32, i32) { ... }
+
+//--- canon.mlir
+// CHECK-LABEL: func.func @times_one
+func.func @times_one(%x: i32) -> i32 { ... }
+
+//--- bad.mlir
+// CHECK: error: use of value '%b' expects different type than prior uses: 'i32' vs 'i64'
+func.func @bad(%a: i32, %b: i64) -> i32 { %0 = arith.addi %a, %b : i32 ... }
+```
+
+How to read it:
+
+- `%t` is the per-test temp path; `split-file` **creates it as a directory**
+  and writes `%t/cse.mlir`, `%t/canon.mlir`, `%t/bad.mlir`.
+- Text **before the first marker is discarded** — so the RUN lines live there
+  and never end up inside a part.
+- Each part is a complete file: it carries its **own** `CHECK` lines and is
+  passed to *both* `mlir-opt` and `FileCheck` by its own path (`%t/cse.mlir`),
+  not `%s`. FileCheck never sees the other parts' checks, so no prefixes are
+  needed.
+- The third part is a **parse error on purpose**: `not` inverts `mlir-opt`'s
+  exit code and FileCheck pins the diagnostic. In a single-module file this
+  case could not coexist with the valid ones.
+
+```bash
+llvm-lit -v build/test --filter='split_file\.mlir'
+ls build/test/Output/split_file.mlir.tmp/        # cse.mlir  canon.mlir  bad.mlir
+```
+
+Markers take the file's comment leader (`//---` here, `;---` for LLVM IR,
+`#---` for Python/asm); `split-file --leading-lines` keeps line numbers aligned
+with the original by padding each part with blank lines, which makes
+diagnostics point at the right line of the *combined* file.
+
+### Step 2 — your own `%{name}` substitutions
+
+`%s`, `%t`, and the tool names are substitutions lit performs on every RUN line
+(Tutorial 1). A suite can define its own. In `test/lit.cfg.py`:
+
+```python
+config.substitutions.append(("%{canon}", "mlir-opt %s -canonicalize"))
+config.substitutions.append(("%{canon-generic}", "%{canon} --mlir-print-op-generic"))
+config.recursiveExpansionLimit = 3
+```
+
+and in `test/custom_subst.mlir`:
+
+```mlir
+// RUN: %{canon} | FileCheck %s
+// RUN: %{canon-generic} | FileCheck %s --check-prefix=GENERIC
+```
+
+The braces are the modern spelling (`%{name}`); they avoid the prefix clashes
+bare `%name` tokens suffer from. What they buy you:
+
+- **One place to change a pipeline.** If every lowering test starts with the
+  same six flags, put them in `%{lower}` and change them once.
+- **Hide paths and tools.** Upstream configs define things like `%{python}`
+  and `%{mlir_runner_utils}`; a site config can point them at build-specific
+  locations without touching tests.
+
+Two rules apply, and breaking either shows up in the failure output:
+
+1. **A replacement may contain other substitutions** (`%s` inside `%{canon}`)
+   — lit walks its substitution list in order, once. For a substitution that
+   expands to *another custom* substitution (`%{canon-generic}` → `%{canon}`)
+   set **`config.recursiveExpansionLimit`**; without it `%{canon}` stays
+   literal and the RUN line fails with `%{canon}: command not found`.
+2. **Register substitutions after `use_default_substitutions()`** so the
+   standard ones (`%s`, `FileCheck`, …) exist, and keep names unique — lit
+   will happily replace `%{canon}` inside `%{canon-generic}` textually if you
+   let the names overlap.
+
+```bash
+llvm-lit -a build/test --filter='custom_subst\.mlir'     # -a shows the expanded RUN lines even on PASS
+```
+
+Look for `RUN: at line 12:` in the output (the second RUN line of the file):
+the nested token has become a full
+`mlir-opt <path> -canonicalize --mlir-print-op-generic` command.
+
 ---
 
 That's the whole pipeline: **lit discovers and runs**, **substitutions fill in
@@ -981,7 +1103,9 @@ paths**, **the tool transforms or executes IR**, and **FileCheck verifies the
 result structurally**. It's the same machinery behind every test in upstream
 LLVM and MLIR. For the CMake + lit wiring and how to turn this into a real
 out-of-tree project with your own `my-opt` driver, see
-[`example/README.md`](example/README.md).
+[`example/README.md`](example/README.md); the
+[`mlir-tablegen/capstone-toy/`](../mlir-tablegen/capstone-toy/README.md) build
+does exactly that with its `toy-opt` tool and `test/` suite.
 
 ## Cheat sheet
 
@@ -996,8 +1120,10 @@ out-of-tree project with your own `my-opt` driver, see
 | Reproduce by hand | `mlir-opt FILE -pass \| FileCheck FILE` |
 | Debug a FileCheck fail | add `--dump-input=fail` to the FileCheck call |
 | Verbose output of passing tests | `llvm-lit -a ...` |
-| Assert a RUN command *fails* | prefix it with `not`: `... \| not FileCheck %s --check-prefix=BAD` |
-| Draft exhaustive CHECK lines | `mlir-opt FILE -pass \| python3 generate-test-checks.py` (Tutorial 6) |
+| Assert a RUN command *fails* | prefix it with `not`: `... \| not FileCheck %s --check-prefix=BAD` (`not --crash` for "must crash") |
+| Draft exhaustive CHECK lines | `mlir-opt FILE -pass \| python3 ../scripts/generate-test-checks.py` (Tutorial 6) |
+| Several inputs in one test file | `split-file %s %t`, then `mlir-opt %t/NAME.mlir … \| FileCheck %t/NAME.mlir` (Tutorial 7) |
+| Suite-wide shorthand for a pipeline | `config.substitutions.append(("%{name}", "..."))` in `lit.cfg.py`; `config.recursiveExpansionLimit` for nesting (Tutorial 7) |
 
 | FileCheck directive | Use |
 |---------------------|-----|

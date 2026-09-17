@@ -36,7 +36,7 @@ then check yourself against it.
 - 13 — [Preprocessing (`#define`, `#ifdef`, `#ifndef`)](#lesson-13--preprocessing)
 
 **Codegen — producing real C++ output**
-- 14 — [Capstone: A Mini Toy ISA](#lesson-14--capstone--a-mini-toy-isa)
+- 14 — [Capstone: A Mini Toy ISA](#lesson-14--capstone-a-mini-toy-isa)
 - 15 — [Instruction Encoding & the `field` keyword](#lesson-15--instruction-encoding--the-field-keyword)
 
 - [Appendix: Bang-Operator Cheat Sheet](#appendix--bang-operator-cheat-sheet)

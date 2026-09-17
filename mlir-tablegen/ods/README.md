@@ -191,6 +191,10 @@ fastest way to see what a given ODS feature actually buys you.
 
 ## Lesson 2 — Operation metadata
 
+> The doc backends and the fields they render (including the attribute/type
+> parameter descriptions most dialects forget) get their own track:
+> [`../docs/`](../docs/README.md).
+
 *Source: `1-dialect-and-ops/02_op_metadata.td`*
 
 Every op carries documentation. `summary` is a one-liner; `description` is a
@@ -405,6 +409,8 @@ static void build(::mlir::OpBuilder &, ::mlir::OperationState &,
 ---
 
 ## Lesson 8 — Traits
+
+> This lesson *uses* MLIR's built-in traits and interfaces. To *define* your own interface, see [`../interfaces/`](../interfaces/README.md).
 
 *Source: `4-traits-and-verification/08_traits.td`*
 

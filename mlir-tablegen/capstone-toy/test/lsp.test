@@ -1,0 +1,27 @@
+// A language-server session as a lit test: the same JSON-RPC-from-a-file
+// format upstream uses (mlir/test/mlir-lsp-server/*.test), FileChecked against
+// the pretty-printed replies. Proves that toy-lsp-server (tools/toy-lsp-server.cpp)
+// understands the dialect: hover on a toy op works and a Toy verifier error
+// arrives as a diagnostic at the right position.
+//
+// RUN: toy-lsp-server --lit-test < %s 2>/dev/null | FileCheck %s
+{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"processId":1,"rootUri":null,"capabilities":{}}}
+// CHECK: "hoverProvider": true
+// -----
+{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"test:///good.mlir","languageId":"mlir","version":1,"text":"func.func @f(%x: f64) -> f64 {\n  %c = toy.constant 2.0\n  %m = toy.mul %x, %c\n  return %m : f64\n}\n"}}}
+// -----
+{"jsonrpc":"2.0","id":1,"method":"textDocument/hover","params":{"textDocument":{"uri":"test:///good.mlir"},"position":{"line":1,"character":12}}}
+// CHECK-LABEL: "id": 1
+// CHECK: "value": "\"toy.constant\"\n\nGeneric Form:\n\n```mlir\n%0 = \"toy.constant\"() <{value = 2.000000e+00 : f64}> : () -> f64
+// -----
+{"jsonrpc":"2.0","id":2,"method":"textDocument/definition","params":{"textDocument":{"uri":"test:///good.mlir"},"position":{"line":2,"character":20}}}
+// CHECK-LABEL: "id": 2
+// CHECK: "line": 1
+// -----
+{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"test:///bad.mlir","languageId":"mlir","version":1,"text":"func.func @g(%a: i32, %b: i32) -> f64 {\n  %0 = \"toy.add\"(%a, %b) : (i32, i32) -> f64\n  return %0 : f64\n}\n"}}}
+// CHECK: "message": "'toy.add' op operand #0 must be 64-bit float, but got 'i32'"
+// CHECK: "line": 1
+// -----
+{"jsonrpc":"2.0","id":3,"method":"shutdown"}
+// -----
+{"jsonrpc":"2.0","method":"exit"}

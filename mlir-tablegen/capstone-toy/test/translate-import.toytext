@@ -1,0 +1,23 @@
+# Import with toy-translate --toytext-to-mlir. lit finds the RUN lines in any
+# comment style, and .toytext is in config.suffixes.
+#
+# RUN: toy-translate --toytext-to-mlir %s | FileCheck %s
+#
+# Imported ops carry the toytext line as their location:
+# RUN: toy-translate --toytext-to-mlir %s --mlir-print-debuginfo | FileCheck %s --check-prefix=LOC
+#
+# Errors point at the offending line of the input (bad.toytext line 3):
+# RUN: not toy-translate --toytext-to-mlir %S/Inputs/bad.toytext 2>&1 | FileCheck %s --check-prefix=ERR
+
+# CHECK: %[[A:.*]] = toy.constant 3.000000e+00
+# CHECK-NEXT: %[[B:.*]] = toy.constant 4.000000e+00
+# CHECK-NEXT: %[[P:.*]] = toy.mul %[[A]], %[[B]]
+# CHECK-NEXT: toy.print %[[P]]
+# LOC: toy.constant 3.000000e+00 loc(#[[L:.*]])
+# LOC: #[[L]] = loc("{{.*}}translate-import.toytext":18:1)
+a = const 3.0
+b = const 4.0
+p = mul a b
+print p
+
+# ERR: bad.toytext:3:1: error: unknown value 'nope'

@@ -12,6 +12,7 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"   // Pure -> ConditionallySpeculatable, etc.
 
 #include "Toy/ToyDialect.h"
+#include "Toy/ToyInterfaces.h"   // must precede the op/type classes that implement them
 
 // The generated type classes (from --gen-typedef-decls).
 #define GET_TYPEDEF_CLASSES

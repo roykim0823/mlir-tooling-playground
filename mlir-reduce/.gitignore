@@ -1,0 +1,12 @@
+# outputs produced when running the README commands from examples/
+examples/reduced.mlir
+examples/canon.mlir
+examples/both.mlir
+examples/t.mlir
+examples/d.mlir
+examples/out.mlir
+examples/toy.mlir
+examples/noise.txt
+examples/reduced.ll
+examples/pow2.ll
+examples/never.ll

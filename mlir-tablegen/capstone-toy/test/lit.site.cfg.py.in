@@ -1,0 +1,13 @@
+@LIT_SITE_CFG_IN_HEADER@
+
+# Paths discovered by CMake, baked into the BUILD dir.
+config.llvm_tools_dir = lit_config.substitute("@LLVM_TOOLS_DIR@")   # FileCheck, not
+config.toy_tools_dir = "@CMAKE_CURRENT_BINARY_DIR@"                # toy-opt
+config.toy_obj_root = "@CMAKE_CURRENT_BINARY_DIR@"
+config.toy_plugin_available = @TOY_PLUGIN_AVAILABLE@                # 1 if ToyPlugin was built
+config.toy_plugin = "@CMAKE_CURRENT_BINARY_DIR@/ToyPlugin@LLVM_PLUGIN_EXT@"   # .dylib / .so
+
+import lit.llvm
+lit.llvm.initialize(lit_config, config)
+
+lit_config.load_config(config, "@CMAKE_CURRENT_SOURCE_DIR@/test/lit.cfg.py")

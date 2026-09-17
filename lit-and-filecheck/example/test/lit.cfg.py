@@ -32,3 +32,11 @@ llvm_config.use_default_substitutions()
 # substitution pointing at the exact built binary.
 llvm_config.with_environment("PATH", config.llvm_tools_dir, append_path=True)
 llvm_config.add_tool_substitutions(["mlir-opt", "mlir-runner"], [config.llvm_tools_dir])
+
+# Custom substitutions (Tutorial 7). Any `%{name}` token can be defined; the
+# replacement may itself use %s and other substitutions. Order matters only for
+# nesting: lit expands the list in order, once, unless recursiveExpansionLimit
+# is set — with it, `%{canon-generic}` -> `%{canon} ...` -> `mlir-opt %s ...`.
+config.substitutions.append(("%{canon}", "mlir-opt %s -canonicalize"))
+config.substitutions.append(("%{canon-generic}", "%{canon} --mlir-print-op-generic"))
+config.recursiveExpansionLimit = 3
