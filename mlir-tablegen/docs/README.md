@@ -10,7 +10,7 @@ are produced exactly this way.
 
 > Required includes: whatever the definitions need (`OpBase.td`,
 > `AttrTypeBase.td`, `EnumAttr.td`, `PassBase.td`, `Interfaces.td`). The
-> [capstone](../capstone-toy/README.md) wires the backends into CMake so
+> [capstone](../../mlir-capstone/README.md) wires the backends into CMake so
 > `cmake --build build --target mlir-doc` writes `build/docs/Toy/*.md`.
 
 | Backend | Input records | Output |
@@ -220,7 +220,7 @@ add_mlir_doc(include/Toy/ToyInterfaces ToyTypeInterfaces Toy/ -gen-type-interfac
 ```
 
 ```bash
-cd ../capstone-toy
+cd ../../mlir-capstone
 cmake --build build --target mlir-doc
 find build/docs -type f
 # build/docs/Toy/ToyDialect.md

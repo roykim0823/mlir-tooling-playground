@@ -1,0 +1,2 @@
+/usr/bin/ar qc libMLIRToy.a CMakeFiles/obj.MLIRToy.dir/lib/ToyDialect.cpp.o CMakeFiles/obj.MLIRToy.dir/lib/ToyInterfaces.cpp.o CMakeFiles/obj.MLIRToy.dir/lib/ToyPatterns.cpp.o CMakeFiles/obj.MLIRToy.dir/lib/ToyPasses.cpp.o CMakeFiles/obj.MLIRToy.dir/lib/ToyTranslate.cpp.o
+/opt/homebrew/opt/llvm@20/bin/llvm-ranlib libMLIRToy.a

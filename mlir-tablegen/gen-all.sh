@@ -7,7 +7,6 @@
 #   <name>.attrdef-decls.inc / .attrdef-defs.inc  (AttrDef/EnumAttr) attrs-and-types/, ods/6-enums/
 #   <name>.typedef-decls.inc / .typedef-defs.inc  (TypeDef)        attrs-and-types/
 #   <name>.enum-decls.inc / .enum-defs.inc        (I32EnumAttr)    ods/6-enums/
-#   <name>.rewriters.inc                          (Pat/Pattern)    drr/
 #   <name>.dialect-decls.inc / .dialect-defs.inc  (Dialect)        each tutorial's intro lesson
 #   <name>.op-doc.md                              (--gen-op-doc)   ods/ metadata lesson
 #   <name>.pass-decls.inc / .pass-doc.md          (Pass)           passes/
@@ -16,7 +15,7 @@
 #
 # Unlike the llvm-tablegen searchable-table demo, the emitted MLIR C++ is meant
 # to be #included into a dialect library and compiled against libMLIR — see
-# capstone-toy/ for a complete, buildable example, and the README for the
+# ../mlir-capstone/ for a complete, buildable example, and the README for the
 # mlir_tablegen() CMake integration.
 set -euo pipefail
 
@@ -37,12 +36,8 @@ emit() {  # <td> <suffix> <backend> [ext] [extra tblgen args...]
 }
 
 count=0
-for td in $(find ods drr attrs-and-types passes interfaces docs -name '*.td' | sort); do
+for td in $(find ods attrs-and-types passes interfaces docs -name '*.td' | sort); do
   count=$((count + 1))
-  if [[ "$td" == drr/* ]]; then
-    emit "$td" rewriters --gen-rewriters
-    continue
-  fi
   # --gen-pass-decls needs a group name (-name), which becomes register<Name>Passes().
   if [[ "$td" == passes/* ]]; then
     emit "$td" pass-decls --gen-pass-decls inc -name Toy

@@ -1,6 +1,6 @@
 # Passes — declaring passes with `--gen-pass-decls`
 
-MLIR's third TableGen workflow. [ODS](../ods) *defines* ops, [DRR](../drr)
+MLIR's third TableGen workflow. [ODS](../ods) *defines* ops, [DRR](../../mlir-patterns/drr)
 *rewrites* them, and a **pass** is the unit the pass manager schedules to run a
 transformation over the IR. Declaring passes in TableGen generates the
 boilerplate every pass needs — command-line argument, name, description,
@@ -9,7 +9,7 @@ leaves exactly one thing to hand-write in C++: `runOnOperation()`.
 
 > The C++ half (the `runOnOperation()` body, an opt-style tool that exposes the
 > pass on the command line, and lit tests that drive it) is in the
-> [`../capstone-toy/`](../capstone-toy) build. These lessons only *generate*.
+> [`../../mlir-capstone/`](../../mlir-capstone) build. These lessons only *generate*.
 > Required include: `mlir/Pass/PassBase.td`.
 
 Unlike the other `mlir-tblgen` backends, this one needs a **group name**:
@@ -228,7 +228,7 @@ num-folded : Number of toy.add ops folded away
 > every pass, including upstream ones like `-cse`. Statistics are for
 > development builds; if a count must be observable in production or in tests,
 > emit a remark instead (the capstone's `report` option does exactly that).
-> [`../../mlir-debugging/`](../../mlir-debugging/README.md) Section 7 lists what
+> [`../../mlir-tools/debugging/`](../../mlir-tools/debugging/README.md) Section 7 lists what
 > else needs an assertions build.
 
 ## Lesson 3 — Anchors, dependent dialects, custom constructors
@@ -317,7 +317,7 @@ inline void registerToyPasses() {
 ## From generated code to a running pass
 
 Everything above is header-only boilerplate. The remaining three pieces are C++
-and CMake, and the [`../capstone-toy/`](../capstone-toy/README.md) build shows
+and CMake, and the [`../../mlir-capstone/`](../../mlir-capstone/README.md) build shows
 them working:
 
 1. **The body.** `lib/ToyPasses.cpp` defines `GEN_PASS_DEF_TOYFOLD`, derives

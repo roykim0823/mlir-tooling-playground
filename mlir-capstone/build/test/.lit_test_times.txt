@@ -1,0 +1,8 @@
+1.060680e+00 fold.mlir
+1.023428e+00 invalid.mlir
+5.752230e-01 lsp.test
+2.157156e+00 plugin.mlir
+1.834958e+00 reduce.mlir
+1.013868e+00 roundtrip.mlir
+1.762923e+00 translate-import.toytext
+1.761861e+00 translate.mlir

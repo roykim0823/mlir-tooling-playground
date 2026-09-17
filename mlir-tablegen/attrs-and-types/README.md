@@ -247,5 +247,5 @@ $MLIR/bin/mlir-tblgen --gen-typedef-defs -I $MLIR/include attrs-and-types/1-basi
 
 For attributes/types **compiled and registered** into a working dialect (with a
 parse/print round-trip), see the capstone:
-[`../capstone-toy/`](../capstone-toy/README.md), which defines a real `!toy.array`
+[`../../mlir-capstone/`](../../mlir-capstone/README.md), which defines a real `!toy.array`
 type and `#toy.shape` attribute alongside its ops.

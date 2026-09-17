@@ -132,11 +132,11 @@ test." In a real out-of-tree MLIR project you would build your own driver
 - write RUN lines as `// RUN: my-opt %s --your-pass | FileCheck %s`.
 
 Everything else — the two-config split, the `.mlir` tests, the directives —
-stays exactly the same. The [`mlir-cmake/`](../../mlir-cmake/README.md)
+stays exactly the same. The [`mlir-tools/cmake/`](../../mlir-tools/cmake/README.md)
 chapter's `skeleton/` is a complete minimal project wired this way. (The other route — keep using stock `mlir-opt` and
 load your dialect into it with `--load-dialect-plugin` — is shown by the same
 capstone's `test/plugin.mlir`.) For a worked example, see
-[`../../mlir-tablegen/capstone-toy/`](../../mlir-tablegen/capstone-toy/README.md):
+[`../../mlir-capstone/`](../../mlir-capstone/README.md):
 its `CMakeLists.txt` builds a `toy-opt` and declares
 `add_lit_testsuite(check-toy ... DEPENDS toy-opt)`, and `test/lit.cfg.py`
 registers `toy-opt` as the tool substitution.

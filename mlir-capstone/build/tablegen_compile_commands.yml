@@ -1,0 +1,96 @@
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyInterfaces.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyInterfaces.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyInterfaces.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyInterfaces.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyInterfaces.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyInterfaces.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyInterfaces.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyInterfaces.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyOps.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyOps.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyOps.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyOps.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyOps.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyOps.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyOps.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyOps.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyOps.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyOps.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyOps.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyOps.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyOps.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyOps.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyOps.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyOps.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyOps.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyOps.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyPasses.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyPasses.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyOps.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyPasses.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyInterfaces.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"
+--- !FileInfo:
+  filepath: "/Users/roy/study/mlir-tooling-playground/mlir-capstone/include/Toy/ToyInterfaces.td"
+  includes: "/Users/roy/study/mlir-tooling-playground/mlir-capstone;/opt/homebrew/opt/llvm@20/include;/opt/homebrew/opt/llvm@20/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/include;/Users/roy/study/mlir-tooling-playground/mlir-capstone/build/include"

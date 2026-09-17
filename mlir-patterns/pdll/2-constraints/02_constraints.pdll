@@ -1,0 +1,57 @@
+//===- 02_constraints.pdll - Lesson 2: constraints & ODS names -----------------===//
+//
+// Mirrors ../../drr/2-constraints/02_constraints.td.
+//
+//   mlir-pdll -x=mlir -I $MLIR/include -I .. 02_constraints.pdll
+//
+//===----------------------------------------------------------------------------===//
+
+// Including the ODS file does three things for PDLL:
+//   1. results can be named:      mul.res      instead of an untyped range
+//   2. attributes can be named:   {value = v}  in an op<> expression
+//   3. the ODS constraints (F64, F64Attr, ...) become PDLL constraints
+#include "ToyOps.td"
+
+// A NATIVE constraint: C++ that must return success() for the match to hold.
+// `rewriter` (a PatternRewriter&) is implicitly available in the body.
+// DRR:  def HasOneUse : Constraint<CPred<"$0.hasOneUse()">, "...">;
+Constraint HasOneUse(v: Value) [{
+  return success(v.hasOneUse());
+}];
+
+// Constraints are applied by calling them as statements in the match section.
+// `with benefit(N)` sets the pattern benefit (DRR: addBenefit).
+//
+// DRR:  def : Pat<(AddOp (MulOp:$mul $a, $b), $c), (FmaOp $a, $b, $c), [(HasOneUse $mul)]>;
+Pattern FuseMulAddOneUse with benefit(2) {
+  let mul = op<toy.mul>(a: Value, b: Value);
+  HasOneUse(mul.res);                            // ODS gave us the name `res`
+  let root = op<toy.add>(mul.res, c: Value);
+  replace root with op<toy.fma>(a, b, c);
+}
+
+// An ATTRIBUTE constraint: `attr<"...">` is a literal attribute (parsed with the
+// MLIR attribute syntax) that the matched attribute must equal.
+// `replace root with x` replaces the op's result with an existing value.
+//
+// DRR:  def : Pat<(MulOp $x, (ConstantOp ConstantAttr<F64Attr, "1.0">)), (replaceWithValue $x)>;
+Pattern MulByOne {
+  let root = op<toy.mul>(x: Value, op<toy.constant> {value = attr<"1.0 : f64">});
+  replace root with x;
+}
+
+// A TYPE constraint on a value: `Value<typeExpr>`. `type<"f64">` is a literal
+// type. Here both operands must be f64 (ODS already guarantees it for toy.add;
+// the point is the syntax, which matters for ops without ODS).
+Pattern AddF64Only {
+  let root = op<toy.add>(x: Value<type<"f64">>, y: Value<type<"f64">>);
+  replace root with op<toy.fma>(x, y, x);
+}
+
+// ODS constraints reused directly: `F64Attr` from OpBase.td is now a PDLL
+// constraint, so `{value = v: F64Attr}` binds v AND checks it is an f64 attr.
+Pattern ScaleByConstant {
+  let c = op<toy.constant> {value = v: F64Attr};
+  let root = op<toy.mul>(x: Value, c.res);
+  replace root with op<toy.scale>(x) {factor = v};
+}

@@ -11,7 +11,7 @@ showed how to *use* MLIR's built-in interfaces; this track shows how to
 
 > Required include: `mlir/IR/Interfaces.td`. The C++ half (implementing the
 > declared methods, a pattern generic over the interface, a pass that counts
-> implementers) is in the [`../capstone-toy/`](../capstone-toy/README.md) build.
+> implementers) is in the [`../../mlir-capstone/`](../../mlir-capstone/README.md) build.
 
 Four backends, one input file each way:
 
@@ -289,7 +289,7 @@ if (!((::llvm::isa<::toy::ContainerTypeInterface>(type))))
 
 ## From `.td` to a generic pass
 
-The [capstone](../capstone-toy/README.md) defines `BinaryArithOpInterface` and
+The [capstone](../../mlir-capstone/README.md) defines `BinaryArithOpInterface` and
 `ContainerTypeInterface` in `ToyInterfaces.td` and uses them three ways:
 
 1. **`toy.add` / `toy.mul` / `toy.sub` implement the op interface**

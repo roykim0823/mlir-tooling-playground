@@ -7,7 +7,7 @@ accessors, builders, verifiers, and the parser/printer.
 
 > This is the MLIR analog of LLVM's instruction descriptions, but far more
 > pervasive: in MLIR *every* dialect (even the built-in ones) is defined this
-> way. See [`../drr/`](../drr) for the rewrite-rule half of MLIR TableGen.
+> way. See [`../../mlir-patterns/drr/`](../../mlir-patterns/drr) for the rewrite-rule half of MLIR TableGen.
 
 Every lesson is a self-contained `.td` file that defines a tiny `toy` dialect
 and runs standalone through `mlir-tblgen`. The required base include is always
@@ -593,5 +593,5 @@ $MLIR/bin/mlir-tblgen --gen-op-defs -I $MLIR/include \
 Consuming the output for real means `#include`-ing it into a dialect library and
 compiling against `libMLIR` (you need a registered dialect + `MLIRContext`),
 which is heavier than a standalone demo — see the top-level
-[README](../README.md#capstone-building-a-real-dialect) for
+[README](../../mlir-capstone/README.md) for
 the standard `mlir_tablegen()` CMake flow.

@@ -782,14 +782,14 @@ internalize:
 In a real out-of-tree project you swap `mlir-opt` for your own `my-opt` driver;
 the RUN/CHECK mechanics are identical (see
 [`example/README.md`](example/README.md) → "Turning this into a real project",
-and [`../mlir-tablegen/capstone-toy/test/`](../mlir-tablegen/capstone-toy) for a
+and [`../mlir-capstone/test/`](../mlir-capstone) for a
 working suite that drives the out-of-tree `toy-opt` built in that directory).
 
 ### Diagnostic tests — `-verify-diagnostics`
 
 > The flags that control how diagnostics *look* when you are not testing them
 > (`--mlir-print-op-on-diagnostic`, `--mlir-print-stacktrace-on-diagnostic`,
-> verbosity) are in [`../mlir-debugging/`](../mlir-debugging/README.md), Section 4.
+> verbosity) are in [`../mlir-tools/debugging/`](../mlir-tools/debugging/README.md), Section 4.
 
 These check that *invalid* input produces the *right* error. You annotate the IR
 with `expected-*` directives and pass `-verify-diagnostics`; the run passes when
@@ -1104,7 +1104,7 @@ result structurally**. It's the same machinery behind every test in upstream
 LLVM and MLIR. For the CMake + lit wiring and how to turn this into a real
 out-of-tree project with your own `my-opt` driver, see
 [`example/README.md`](example/README.md); the
-[`mlir-tablegen/capstone-toy/`](../mlir-tablegen/capstone-toy/README.md) build
+[`mlir-capstone/`](../mlir-capstone/README.md) build
 does exactly that with its `toy-opt` tool and `test/` suite.
 
 ## Cheat sheet
