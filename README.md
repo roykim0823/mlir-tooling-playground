@@ -25,7 +25,7 @@ this order; each says at the top what it assumes from the ones before.
 | # | Track | What you learn | Runner |
 |---|---|---|---|
 | 1 | [`lit-and-filecheck/`](lit-and-filecheck) | how every LLVM/MLIR test works: `RUN:` lines, `CHECK:` directives, diagnostics tests, `split-file`, custom substitutions, the checks generator. 7 tutorials on a standalone lit project. | `scripts/try.sh` |
-| 2 | [`llvm-tablegen/`](llvm-tablegen) | the TableGen language with `llvm-tblgen` (16 lessons), then writing a TableGen backend in C++ (6 lessons). | `language/gen-all.sh`, `backend/run-all.sh` |
+| 2 | [`llvm-tablegen/`](llvm-tablegen) | TableGen after LLVM's four TableGen documents: the overview, replayed on the real X86 target; the language (17 lessons); the stock backends (5), a backend in Python over `--dump-json`, and backends in C++ (7). Every example is a lit test. | `check.sh` |
 | 3 | [`mlir-tablegen/`](mlir-tablegen) | MLIR's TableGen workflows: ODS for ops (12 lessons), attributes and types (10), pass declarations (3), your own interfaces (3), the documentation backends (1). | `gen-all.sh` |
 | 4 | [`mlir-patterns/`](mlir-patterns) | rewriting IR declaratively: DRR in TableGen (5 lessons) and the same rewrites in PDLL (5 lessons), with a comparison of both against hand-written C++. | `gen-all.sh` |
 | 5 | [`mlir-capstone/`](mlir-capstone) | everything above compiled into one out-of-tree dialect: a library, `toy-opt`, a plugin for the stock `mlir-opt`, `toy-reduce`, `toy-translate`, `toy-lsp-server`, generated docs, and a lit suite of 8 tests. | `cmake --build build --target check-toy` |
@@ -86,9 +86,11 @@ version of it, and ends in a lit test in the capstone.
 
 ```
 lit-and-filecheck/      tutorial, example/ (standalone lit project), scripts/try.sh
-llvm-tablegen/
-  language/             16 lessons + solutions, gen-all.sh
-  backend/              6 C++ backends, run-all.sh
+llvm-tablegen/          check.sh builds and runs everything; fetch-x86.sh
+  language/examples/    17 lessons, each a lit test
+  backend/stock/         5 lessons on the backends llvm-tblgen ships
+  backend/json/         a backend in Python, over --dump-json
+  backend/writing/       7 C++ backends
 mlir-tablegen/          gen-all.sh runs every lesson below
   ods/                  12 lessons        attrs-and-types/   10 lessons
   passes/                3 lessons        interfaces/         3 lessons

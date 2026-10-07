@@ -1,0 +1,10 @@
+# RUN: %stock_bin/searchable-demo | FileCheck %s
+# REQUIRES: stock-build
+#
+# Runs the C++ consumer of 02_searchable_tables.td (searchable_demo.cpp),
+# built by CMakeLists.txt.
+
+# CHECK:      encoding 0x10 -> ld (LSU, hasSideFx=1)
+# CHECK-NEXT: name "Mul"    -> encoding 0x03
+# CHECK-NEXT: encoding 0x7f -> not found (dbg is not Listed)
+# CHECK-NEXT: encoding 0x99 -> not found (above the last key)

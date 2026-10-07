@@ -1,0 +1,42 @@
+# REQUIRES: x86-td
+# RUN: llvm-tblgen -I %llvm_include -I %x86 %x86/X86.td --gen-register-info | FileCheck --check-prefix=REG %s
+# RUN: llvm-tblgen -I %llvm_include -I %x86 %x86/X86.td --gen-instr-info | FileCheck --check-prefix=INSTR %s
+# RUN: llvm-tblgen -I %llvm_include -I %x86 %x86/X86.td --gen-disassembler | FileCheck --check-prefix=DIS %s
+# RUN: llvm-tblgen -I %llvm_include -I %x86 %x86/X86.td --gen-x86-fold-tables | FileCheck --check-prefix=FOLD %s
+# RUN: not llvm-tblgen -I %llvm_include -I %x86 %x86/X86.td --gen-emitter 2>&1 | FileCheck --check-prefix=EMIT %s
+#
+# Lesson 5 — The same backends on X86
+#
+# Lesson 3's backends on a real target. Run ../../fetch-x86.sh first; until
+# then lit reports this test as UNSUPPORTED. Each run takes about a second and
+# writes from 15 thousand lines (--gen-register-info) to 400 thousand
+# (--gen-disassembler).
+
+# Same shape as MiniISA's output, at x86 scale: 391 registers instead of 4.
+# REG-LABEL: #ifdef GET_REGINFO_ENUM
+# REG:         EAX = {{[0-9]+}},
+# REG:         NUM_TARGET_REGS // {{[0-9]+}}
+# REG:         GR32RegClassID = {{[0-9]+}},
+
+# ADD32rr is the record the overview (../../README.md) follows from source to
+# --print-records. Here it becomes an opcode and an MCInstrDesc whose flags
+# come from its `let` bindings: isCommutable, isConvertibleToThreeAddress.
+# INSTR:     ADD32rr	= [[ADD:[0-9]+]],
+# INSTR:     INSTRUCTION_LIST_END = {{[0-9]+}}
+# INSTR:     { [[ADD]],	3,	1, {{.*}}(1ULL<<MCID::ConvertibleTo3Addr)|(1ULL<<MCID::Commutable){{.*}}  // Inst #[[ADD]] = ADD32rr
+
+# The flag is the same, but the output is not: x86 instructions are variable
+# length, so llvm-tblgen switches to an X86-specific disassembler emitter
+# that builds opcode maps and ModRM tables.
+# DIS: static const struct InstructionSpecifier x86DisassemblerInstrSpecifiers[{{[0-9]+}}] = {
+# DIS: static const struct ContextDecision x86DisassemblerOneByteOpcodes = {
+
+# Backends that exist only for X86 (--gen-x86-fold-tables,
+# --gen-x86-mnemonic-tables, --gen-x86-instr-mapping). The fold table says
+# which register form can fold a memory operand into which memory form.
+# FOLD: {X86::ADD32rr, X86::ADD32mr, TB_NO_REVERSE},
+
+# And one that X86 cannot use: CodeEmitterGen needs a fixed-width `Inst`
+# field (language lesson 17), and x86 encodings are produced by hand-written
+# C++ in X86MCCodeEmitter.cpp instead.
+# EMIT: error: Record `{{[A-Z0-9_]+}}' does not have a field named `Inst'!

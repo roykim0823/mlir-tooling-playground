@@ -1,1161 +1,638 @@
-# LLVM TableGen — A Step-by-Step Tutorial
+# The TableGen language
 
-This tutorial walks you through LLVM's **TableGen** language from the ground up, based on the official *TableGen Programmer's Reference*. Each lesson introduces one new concept, gives you a complete file you can run with `llvm-tblgen`, and shows the expected output.
+Seventeen lessons on the TableGen language, in the order of the
+[TableGen Programmer's Reference](https://releases.llvm.org/20.1.0/docs/TableGen/ProgRef.html)
+(ProgRef): lexical elements and types, then values, then statements, then
+the further topics. The last two lessons put the language to work.
 
-> **What is TableGen?** TableGen is a declarative language used inside LLVM to describe large, repetitive data tables (registers, instructions, intrinsics, AST nodes, diagnostics…). You write `.td` files containing **classes** (templates) and **records** (concrete data). A *backend* program then reads those records and emits C++ `.inc` files (or anything else it wants).
+Each lesson is one file in [`examples/`](examples). The file contains the
+code from the lesson, the answers to its exercises, and its expected output
+as FileCheck lines. Lit runs it as a test:
 
----
-
-## Table of Contents
-
-The headings below group them into four themes by what each
-concept is *for*. The [Directory layout](#directory-layout) table at the end
-links the worked solution file behind each lesson (each one also contains the
-answers to that lesson's "Try it yourself" exercises) — try the exercises first,
-then check yourself against it.
-
-- 0 — [Prerequisites & Setup](#lesson-0--prerequisites--setup)
-
-**Basics — the core declarative model**
-- 1 — [Your First Record](#lesson-1--your-first-record)
-- 2 — [Classes and Inheritance](#lesson-2--classes-and-inheritance)
-- 3 — [Types: bit, int, bits<N>, string, list, dag, code](#lesson-3--types)
-- 4 — [Template Arguments](#lesson-4--template-arguments)
-
-**Metaprogramming — computing values & deriving records**
-- 5 — [The `let` Statement](#lesson-5--the-let-statement)
-- 6 — [Values, Expressions, and Bang Operators](#lesson-6--values-expressions-and-bang-operators)
-- 7 — [The Paste Operator `#`](#lesson-7--the-paste-operator-)
-- 9 — [`defvar`, `defset`, `deftype`](#lesson-9--defvar-defset-deftype)
-- 12 — [Classes as Subroutines](#lesson-12--classes-as-subroutines)
-
-**Record generation — generating & composing many records**
-- 8 — [`multiclass` and `defm`](#lesson-8--multiclass-and-defm)
-- 10 — [Control Flow: `foreach`, `if`, `assert`, `dump`](#lesson-10--control-flow)
-- 11 — [DAGs — Directed Acyclic Graphs](#lesson-11--dags)
-- 13 — [Preprocessing (`#define`, `#ifdef`, `#ifndef`)](#lesson-13--preprocessing)
-
-**Codegen — producing real C++ output**
-- 14 — [Capstone: A Mini Toy ISA](#lesson-14--capstone-a-mini-toy-isa)
-- 15 — [Instruction Encoding & the `field` keyword](#lesson-15--instruction-encoding--the-field-keyword)
-
-- [Appendix: Bang-Operator Cheat Sheet](#appendix--bang-operator-cheat-sheet)
-
----
-
-## Lesson 0 — Prerequisites & Setup
-
-### What you need
-- A built copy of LLVM, or an installed package that includes the `llvm-tblgen` binary.
-- A text editor.
-
-### Verify the tool
 ```bash
-llvm-tblgen --version
+llvm-tblgen examples/08_let.td        # read the output yourself
+lit -v examples/08_let.td             # or check it against the CHECK lines
+lit -sv examples                      # all seventeen
 ```
-You should see LLVM's version info. If you don't, install LLVM (e.g. `apt install llvm`, `brew install llvm`, or build from source).
 
-### The two flags you'll use most
+> **Version.** Everything here is checked against `llvm-tblgen` 20.1.8. Read
+> the [LLVM 20 ProgRef](https://releases.llvm.org/20.1.0/docs/TableGen/ProgRef.html),
+> not the one on llvm.org/docs, which is built from LLVM's main branch. The
+> main-branch page lists bang operators that LLVM 20 rejects as
+> `unknown operator`, such as `!match`, `!instances` and `!getdagopname`.
+
+## How to read an example
+
+```tablegen
+// RUN: llvm-tblgen %s | FileCheck %s                                   (1)
+// RUN: not llvm-tblgen -DBAD_LET %s 2>&1 | FileCheck --check-prefix=BAD %s
+...the lesson's code...                                                 (2)
+#ifdef BAD_LET                                                          (3)
+let Own = 5 in
+  def Bad : Inst { int Own = 3; }
+#endif
+// BAD: error: Value 'Own' unknown!
+// ---- Try it yourself: answers ----                                    (4)
+// ---- Expected output ----                                             (5)
+// CHECK-LABEL: def ADD { // Inst
+// CHECK-NEXT:  bit hasSideFx = 0;
+```
+
+1. `RUN:` lines are the commands. `%s` is the file itself. Lit runs them from
+   [`../lit.cfg.py`](../lit.cfg.py), which puts LLVM's `bin/` on `PATH` (set
+   `LLVM_BIN` if yours is not Homebrew's `llvm@20`).
+2. The code is the lesson's code, unabridged.
+3. A deliberate error is fenced in `#ifdef`, so it only runs when the second
+   `RUN:` line passes `-D`. The `BAD:` lines check the diagnostic.
+4. The exercise answers come after the lesson code. Try the exercises in the
+   README before reading them.
+5. The expected output. `--print-records` (the default) prints classes and
+   then defs, **sorted by name**, so the `CHECK-LABEL` blocks follow that
+   order and not the order of the source.
+
+Change something and rerun lit: the first line of output that moved is
+reported with the expected and actual text side by side. Track 1
+([`../../lit-and-filecheck`](../../lit-and-filecheck)) explains `RUN:`,
+`CHECK-LABEL`, `CHECK-NEXT` and `CHECK-NOT` in detail.
+
+### Flags used here
+
 | Flag | Meaning |
 |---|---|
-| `--print-records` | Dump every record TableGen builds (the *default* if no backend is specified). |
-| `--print-detailed-records` | Same, plus inheritance info, classes, defsets, etc. |
-| `-I <dir>` | Add an include search path. |
-| `-D <macro>` | Define a preprocessor macro from the command line. |
+| `--print-records` | Print every class and record. The default. |
+| `--print-detailed-records` | Also globals, source locations, and which `defm` made each record. |
+| `--dump-json` | Every record as JSON (lesson 17; [`../backend/json`](../backend/json)). |
+| `-I <dir>` | Add an include directory (lesson 15). |
+| `-D <name>` | Define a preprocessor macro (lesson 15). |
+| `--no-warn-on-unused-template-args` | Silence the warning shown in lesson 7. |
 
-### How to "run" every example in this tutorial
-Save the snippet as `example.td`, then:
-```bash
-llvm-tblgen --print-records example.td
-```
-That's it — every lesson uses this command unless noted otherwise.
+## Lessons
+
+| # | Lesson | File | ProgRef |
+|---|---|---|---|
+| 1 | [Records, fields and literals](#1--records-fields-and-literals) | [`01_records_and_literals.td`](examples/01_records_and_literals.td) | Lexical Analysis; `def` |
+| 2 | [Types](#2--types) | [`02_types.td`](examples/02_types.td) | Types; Simple values |
+| 3 | [Values and suffixes](#3--values-and-suffixes) | [`03_values_and_suffixes.td`](examples/03_values_and_suffixes.td) | Values and Expressions; Suffixed values |
+| 4 | [Bang operators](#4--bang-operators) | [`04_bang_operators.td`](examples/04_bang_operators.td) | Bang operators; Appendix A |
+| 5 | [The paste operator](#5--the-paste-operator-) | [`05_paste.td`](examples/05_paste.td) | The paste operator; Appendix B |
+| 6 | [Classes and records](#6--classes-and-records) | [`06_classes.td`](examples/06_classes.td) | `class`; `def`; Examples: classes and records |
+| 7 | [Template arguments](#7--template-arguments) | [`07_template_args.td`](examples/07_template_args.td) | `class` (template args, `NAME`); Record Bodies |
+| 8 | [`let`, and how records are built](#8--let-and-how-records-are-built) | [`08_let.td`](examples/08_let.td) | `let`; How records are built |
+| 9 | [`multiclass` and `defm`](#9--multiclass-and-defm) | [`09_multiclass.td`](examples/09_multiclass.td) | `multiclass`; `defm`; Examples |
+| 10 | [`defvar`, `defset`, `deftype`](#10--defvar-defset-deftype) | [`10_defvar_defset_deftype.td`](examples/10_defvar_defset_deftype.td) | `defvar`; `defset`; `deftype`; Defvar in a record body |
+| 11 | [`foreach` and `if`](#11--foreach-and-if) | [`11_foreach_if.td`](examples/11_foreach_if.td) | `foreach`; `if` |
+| 12 | [`dump` and `assert`](#12--dump-and-assert) | [`12_dump_assert.td`](examples/12_dump_assert.td) | `dump`; `assert` |
+| 13 | [DAGs](#13--dags) | [`13_dags.td`](examples/13_dags.td) | Directed acyclic graphs |
+| 14 | [Classes as subroutines](#14--classes-as-subroutines) | [`14_subroutines.td`](examples/14_subroutines.td) | Using Classes as Subroutines |
+| 15 | [Preprocessing and `include`](#15--preprocessing-and-include) | [`15_preprocessor.td`](examples/15_preprocessor.td) | Include files; Preprocessing Facilities |
+| 16 | [Capstone: MiniISA](#16--capstone-miniisa) | [`16_miniisa.td`](examples/16_miniisa.td) | (all of the above) |
+| 17 | [Capstone: instruction encoding and `field`](#17--capstone-instruction-encoding-and-field) | [`17_encoding.td`](examples/17_encoding.td) | `field`; Suffixed values |
+| | [Appendix: bang operators in LLVM 20](#appendix--bang-operators-in-llvm-20) | | Appendix A |
 
 ---
 
-## Lesson 1 — Your First Record
+## 1 — Records, fields and literals
 
-### Concepts
-- A **record** is a named bag of typed fields, defined with `def`.
-- Fields have a **type** and an optional **initial value**.
-- An uninitialized value is written `?`.
+A **record** is a named set of typed fields, defined with `def`. A field
+always states its type, because TableGen does not infer a field's type from
+its value. `?` means "no value yet".
 
-### Code
 ```tablegen
 def Apple {
-  string Color = "red";
-  int    Weight = 150;        // grams
+  string Color  = "red";
+  int    Weight = 150;
   bit    Edible = 1;
-  string Origin = ?;          // uninitialized
-}
-```
-
-### Run it
-```bash
-llvm-tblgen --print-records solution/01_first.td
-```
-
-### Expected output (excerpt)
-```
-def Apple {
-  string Color = "red";
-  int Weight = 150;
-  bit Edible = 1;
   string Origin = ?;
 }
 ```
 
-### Key takeaways
-- `def NAME { ... }` defines a single record.
-- The type **must** be written explicitly before each field name — TableGen does *not* infer the type of a field from its initializer.
-- `?` is a real value meaning "no value yet."
+Literals:
+- Integers can be decimal, `0x` hex or `0b` binary. The sign belongs to the
+  token, so `-42` is one literal.
+- `true` and `false` are 1 and 0.
+- Adjacent strings concatenate, as in C. The escapes are `\\ \' \" \t \n`.
+- `[{ ... }]` is a code literal: a string that can span lines.
+- `/* */` comments nest.
+- An identifier may start with digits (`def 3DNow`), as long as the token is
+  not a number.
 
-### Try it yourself
-1. Add a `list<int>` field called `SeedCounts` initialized to `[2, 3, 5]`.
-2. Add a `bits<4>` field called `RipenessScale` set to `0b1010`.
+The printer echoes strings without re-escaping them, and a field initialized
+with a code literal prints as `code`:
 
----
-
-## Lesson 2 — Classes and Inheritance
-
-### Concepts
-- A **class** (`class`) is an *abstract* record — a template that other records can inherit from.
-- A `def D : C` says "record `D` inherits the fields of class `C`."
-- Inherited fields can be **overridden** in the body of the derived record using `let`.
-
-### Code
-```tablegen
-class Fruit {
-  string Color  = "unknown";
-  bit    Edible = 1;
-}
-
-def Apple  : Fruit { let Color = "red"; }
-def Lemon  : Fruit { let Color = "yellow"; }
-def Acorn  : Fruit { let Edible = 0; }      // keeps Color = "unknown"
 ```
-
-### Expected output
-```
-def Acorn {     // Fruit
-  string Color = "unknown";
-  bit Edible = 0;
-}
-def Apple {     // Fruit
-  string Color = "red";
-  bit Edible = 1;
-}
-def Lemon {     // Fruit
-  string Color = "yellow";
-  bit Edible = 1;
+def Literals {
+  ...
+  string Escaped = "a	b"c";
+  code Code = [{x + 1}];
 }
 ```
 
-Note the comment `// Fruit` next to each record — that's TableGen telling you which classes the record inherits.
+**Try it yourself.** Add a `list<int> SeedCounts = [2, 3, 5]` and a
+`bits<4> RipenessScale = 0b1010` to `Apple`.
 
-### Multiple inheritance
-A record can inherit from any number of classes:
-```tablegen
-class HasPrice  { int Price = 0; }
-class HasColor  { string Color = "white"; }
+## 2 — Types
 
-def Banana : HasPrice, HasColor {
-  let Price = 50;
-  let Color = "yellow";
-}
-```
-
-If two parent classes define the **same field**, the *last* parent's value wins (before the record body's own `let`s).
-
-### Try it yourself
-- Define a class `Vehicle` with `int Wheels = 4;` and `bit Motorized = 1;`.
-- Define `Bicycle`, `Truck`, and `Skateboard` records inheriting from it, overriding fields appropriately.
-
----
-
-## Lesson 3 — Types
-
-TableGen's built-in types:
-
-| Type | Meaning |
+| Type | Values |
 |---|---|
-| `bit` | A single boolean (0 or 1). |
-| `int` | A signed 64-bit integer. |
-| `bits<N>` | A fixed-width vector of N bits — *individual bits are addressable*. |
-| `string` | An ordered sequence of characters. |
-| `code` | Alias for `string`, traditionally used for code blocks `[{ ... }]`. |
-| `list<T>` | A homogenous list of type T. |
-| `dag` | A directed-acyclic-graph node (see Lesson 11). |
-| `ClassName` | The value must be a record that inherits from `ClassName`. |
+| `bit` | 0 or 1 |
+| `int` | 64-bit signed integer |
+| `string` | characters; `code` is another spelling |
+| `bits<n>` | n individually addressable bits |
+| `list<T>` | elements of type T, including other lists |
+| `dag` | `(operator args...)`, a node of a tree (lesson 13) |
+| *ClassName* | a record that inherits from that class |
 
-### Code
 ```tablegen
-class Anything;
-def  X : Anything;
-def  Y : Anything;
-
 def TypeShowcase {
-  bit        Flag   = 1;
-  int        N      = -42;
-  bits<8>    Opcode = 0b00010110;       // 8 bits
-  string     S      = "hello";
-  string     Big    = "abc"  "def";     // adjacent literals concatenate -> "abcdef"
-  code       Body   = [{
-    return x + 1;
-  }];
-  list<int>  Primes = [2, 3, 5, 7];
-  list<list<int>> Matrix = [[1,2],[3,4]];
-  Anything   Ref    = X;                // a typed record reference
-  list<Anything> Refs = [X, Y];
+  bits<8>        Opcode = 0b00010110;
+  list<list<int>> Matrix = [[1, 2], [3, 4]];
+  dag            D      = (op 1, "two");
+  Anything       Ref    = X;              // X must be derived from Anything
 }
 ```
 
-### Accessing individual bits
-You can pull out a bit or a slice of a `bits<N>` field using **braces**:
+A value converts implicitly when nothing is lost: an int to `bits<4>`, a
+`bits<4>` to an int, 0 or 1 to a `bit`. `{0, 1, 1, 1}` is a bits value
+written MSB first. An empty list needs its element type: `[]<int>`.
+
+A class-typed field rejects anything else. The example builds this error
+under `-DBAD_TYPE`:
+
+```
+error: Field 'R' of type 'Anything' is incompatible with value '5' of type 'int'
+```
+
+**Try it yourself.** Make a `bits<16>` instruction word, then extract its top
+6 bits as an opcode and the low 10 as an immediate.
+
+## 3 — Values and suffixes
+
+A value can be followed by suffixes that select part of it:
+
+| Suffix | Selects |
+|---|---|
+| `v{3}` | bit 3 of an int or bits value (bit 0 is least significant) |
+| `v{7...4}` | bits 7 down to 4; `v{4...7}` gives the same bits reversed |
+| `v{7, 0, 1}` | any list of bit positions |
+| `l[1]` | element 1 of a list |
+| `l[1,]` | a one-element list (note the trailing comma) |
+| `l[3...4, 0, 0]` | a new list; ranges and repeats in any order |
+| `l[!range(2)]` | indices can be expressions |
+| `r.F` | field `F` of record `r` |
+
+An identifier on its own can name several things: a field of this record, a
+record, a template argument, a `defvar`, or a `foreach` variable.
 
 ```tablegen
-def Demo {
-  bits<8> Op  = 0b10110010;
-  bit     B0  = Op{0};        // -> 0   (least significant)
-  bit     B7  = Op{7};        // -> 1
-  bits<4> Top = Op{7...4};    // -> { 1, 0, 1, 1 }
+def Lookups {
+  int    Y = Other.X;
+  int    Z = !add(Y, 1);              // Y: this record's own field
+  string N = !cast<string>(Other);    // "Other"
 }
 ```
 
-> **Bit endianness:** `{7...4}` means "from bit 7 down to bit 4." `{4...7}` means the **same range reversed**.
+The range syntax `{7-4}` with a hyphen is deprecated; use `...`.
 
-### Try it yourself
-1. Make a record with a `bits<16>` field for an instruction word.
-2. Extract the top 6 bits as a `bits<6>` opcode field and the bottom 10 as a `bits<10>` immediate field.
+**Try it yourself.** Split `0xBEEF` into its low and high bytes, and take
+every other element of a list with a slice.
 
----
+## 4 — Bang operators
 
-## Lesson 4 — Template Arguments
+A **bang operator** is a built-in function whose name starts with `!`. LLVM 20
+has 51 of them, plus `!cond`. Lesson 4 uses all 43 that do not work on dags;
+lesson 13 uses the other 8. The [appendix](#appendix--bang-operators-in-llvm-20)
+lists them all.
 
-A class can take **template arguments** in angle brackets `< ... >`. They're like function parameters — they let one class generate many records.
-
-### Code
-```tablegen
-class Register<string n, int num> {
-  string Name   = n;
-  int    Number = num;
-  bit    IsCallerSaved = 0;            // default
-}
-
-def R0 : Register<"r0", 0>;
-def R1 : Register<"r1", 1>;
-def R2 : Register<"r2", 2> { let IsCallerSaved = 1; }
-```
-
-### Expected output
-```
-def R0 {        // Register
-  string Name = "r0";
-  int Number = 0;
-  bit IsCallerSaved = 0;
-}
-def R1 {        // Register
-  string Name = "r1";
-  int Number = 1;
-  bit IsCallerSaved = 0;
-}
-def R2 {        // Register
-  string Name = "r2";
-  int Number = 2;
-  bit IsCallerSaved = 1;
-}
-```
-
-### Default values & required vs optional arguments
-```tablegen
-class Inst<int opc, string mnem = "?", bit hasSideFx = 0> {
-  int    Opcode    = opc;
-  string Mnemonic  = mnem;
-  bit    HasSideFx = hasSideFx;
-}
-
-def ADD : Inst<0x01, "add">;     // uses default HasSideFx = 0
-def NOP : Inst<0x00>;            // uses two defaults
-def OUT : Inst<0x10, "out", 1>;  // overrides everything
-```
-
-> **Rule:** all *required* arguments (no `=`) must come before any *optional* ones.
-
-### Positional vs named arguments
-```tablegen
-def DIV : Inst<opc=0x20, mnem="div">;     // named
-def MUL : Inst<0x21, hasSideFx=1>;        // mix: positional then named
-```
-
-> Positional must come before named, and you can't specify the same argument twice.
-
-### The implicit `NAME` template argument
-Every class has a hidden template argument **`NAME`** that holds the name of the `def`/`defm` that's instantiating it. This becomes very powerful with multiclasses (Lesson 8). For now, a taste:
+Booleans are ints: 0 is false and anything else is true. A boolean result is
+1 or 0.
 
 ```tablegen
-class Tagged {
-  string MyName = NAME;
-}
-def Alpha : Tagged;     // MyName = "Alpha"
-def Beta  : Tagged;     // MyName = "Beta"
+int Quot = !div(-7, 2);              // -3: signed, rounds toward zero
+int Srl  = !srl(-16, 60);            // 15: logical shift
+int Sra  = !sra(-16, 2);             // -4: arithmetic shift
+int From = !find("abcabc", "c", 3);  // 5: search starts at index 3
+list<int> R3 = !range(10, 0, -3);    // [10, 7, 4, 1]
+list<int> R4 = !range(["a", "b", "c"]);   // [0, 1, 2]: the indices
 ```
 
-### Try it yourself
-- Write a class `GPR<int n>` that auto-builds `string AsmName = "x" # n;` (paste operator — covered in Lesson 7, just copy this for now).
-- Instantiate `X0` through `X3`.
-
----
-
-## Lesson 5 — The `let` Statement
-
-`let` overrides field values. It comes in three flavors.
-
-### Flavor A — inside a record body
-```tablegen
-class Inst { bit hasSideFx = 0; int Latency = 1; }
-
-def LOAD : Inst {
-  let hasSideFx = 1;
-  let Latency = 4;
-}
-```
-
-### Flavor B — top-level `let ... in { ... }` block
-This applies bindings to **every** record defined inside the block.
+`!if(c, a, b)` and `!cond(c1 : v1, c2 : v2, ...)` choose a value. `!cond`
+tries its conditions in order, and it is an error if none is true, so end with
+`true : default`. `!foreach`, `!filter` and `!foldl` map, filter and fold a
+list:
 
 ```tablegen
-class Inst { bit hasSideFx = 0; int Latency = 1; }
-
-let hasSideFx = 1, Latency = 8 in {
-  def LOAD  : Inst;
-  def STORE : Inst;
-}
-```
-Both `LOAD` and `STORE` end up with `hasSideFx = 1` and `Latency = 8`.
-
-> **Important:** Top-level `let` only overrides *inherited* fields. A field defined *directly* in the record body is **not** overridden by an outer `let`.
-
-### Flavor C — appending to a list (there is no `let append` / `let prepend`)
-You'll want to *concatenate* instead of replace. TableGen has no `let` flavor
-for that — the idiom is `!listconcat` with the extras passed as template
-parameters.
-
-```tablegen
-// TableGen has no `let append`/`let prepend`. Use !listconcat — and because
-// `let items = f(items)` self-references the field being assigned, the clean
-// idiom is to pass the extras as class template parameters.
-// class Base   { list<int> items = [2, 3]; }
-// class Middle : Base   { let append  items = [4]; }   // -> [2, 3, 4]
-// def   Final  : Middle { let prepend items = [1]; }   // -> [1, 2, 3, 4]
-
-class Base { list<int> items = [2, 3]; }
-class WithExtras<list<int> pre, list<int> post> {
-  list<int> items = !listconcat(pre, !listconcat([2, 3], post));
-}
-
-def Appended  : WithExtras<[],  [4]>;         // -> [2, 3, 4]
-def Prepended : WithExtras<[1], []>;          // -> [1, 2, 3]
-def Both      : WithExtras<[1], [4]>;         // -> [1, 2, 3, 4]
-def Override  : Base { let items = [10, 20, 30]; }   // plain override
+int Max = !foldl(0, [3, 9, 2, 7], m, x, !if(!gt(x, m), x, m));   // 9
 ```
 
-### Setting individual bits
-```tablegen
-class Inst { bits<8> Opcode = 0; }
+`!cast<T>` converts a value. Cast a record to `string` to get its name; cast a
+string to a record class to look up the record with that name. `!isa`,
+`!exists` and `!initialized` test types, names and `?`. `!repr` turns any
+value into a string for debugging; its format is not stable.
 
-def ADD : Inst {
-  let Opcode{7-4} = 0b0010;   // upper nibble
-  let Opcode{3-0} = 0b1100;   // lower nibble
-}
-```
-
-### Try it yourself
-- Use a top-level `let isCall = true in { ... }` to mark a group of "instruction" records as calls.
-- Grow a `list<string> Predicates` across an inheritance chain using the
-  Flavor C idiom (extras as template parameters + `!listconcat`).
-
----
-
-## Lesson 6 — Values, Expressions, and Bang Operators
-
-A **bang operator** is a built-in function whose name starts with `!`. They turn TableGen from a glorified config language into a real metaprogramming tool.
-
-### The core arithmetic & logic ones
-```tablegen
-def Math {
-  int   Sum    = !add(1, 2, 3, 4);        // 10
-  int   Diff   = !sub(10, 3);             // 7
-  int   Prod   = !mul(2, 3, 4);           // 24
-  int   Quot   = !div(20, 6);             // 3   (signed integer division)
-  int   Shl    = !shl(1, 4);              // 16
-  bit   And    = !and(1, 1, 0);           // 0
-  bit   Or     = !or(0, 0, 1);            // 1
-  bit   Not    = !not(0);                 // 1
-  bit   Eq     = !eq(3, 3);               // 1
-  bit   Lt     = !lt(2, 5);               // 1
-  int   Lg2    = !logtwo(16);             // 4
-}
-```
-
-### Strings
-```tablegen
-def Strs {
-  string Hi    = !strconcat("Hel", "lo");        // "Hello"
-  int    Len   = !size("Hello");                 // 5
-  int    Pos   = !find("Hello world", "world");  // 6
-  string Sub   = !substr("Hello world", 6, 5);   // "world"
-  string Up    = !toupper("abc");                // "ABC"
-  string Down  = !tolower("ABC");                // "abc"
-  string Rep   = !repr([1, 2, 3]);               // "[1, 2, 3]" (debug only)
-}
-```
-
-### Lists
-```tablegen
-def Ls {
-  list<int> A     = !listconcat([1,2], [3,4]);     // [1,2,3,4]
-  list<int> Spl   = !listsplat(7, 3);              // [7,7,7]
-  list<int> Rng   = !range(0, 5);                  // [0,1,2,3,4]
-  list<int> Rng2  = !range(10, 0, -2);             // [10,8,6,4,2]
-  int       Sz    = !size([10, 20, 30]);           // 3
-  int       Hd    = !head([10, 20, 30]);           // 10
-  list<int> Tl    = !tail([10, 20, 30]);           // [20, 30] — all but the head (2nd element through last)
-  list<int> Flat  = !listflatten([[1,2],[3,4]]);   // [1,2,3,4]
-  string    Join  = !interleave([1,2,3], ", ");    // "1, 2, 3"
-}
-```
-
-#### When is `!tail` useful?
-
-On its own, `!tail` just drops the first element — which looks pointless. Its
-real job is **recursion over a list**: handle `!head` now, recurse on `!tail`,
-and stop when `!empty`. A class can reference itself, so `!tail` is what shrinks
-the list on each step until the base case:
+`!head` and `!tail` look odd until you write a recursive class, where `!tail`
+shrinks the list on each step:
 
 ```tablegen
 class Sum<list<int> xs> {
-  int ret = !if(!empty(xs), 0,                        // base case: empty -> 0
-                !add(!head(xs), Sum<!tail(xs)>.ret));  // head + sum of the rest
-}
-def SumDemo { int total = Sum<[1, 2, 3, 4]>.ret; }    // 10
-```
-
-In modern TableGen, `!foldl` / `!foreach` / `!filter` (below) cover most list
-work without manual recursion — that same sum is just
-`!foldl(0, xs, acc, x, !add(acc, x))`. Reach for head/tail recursion only when a
-fold doesn't fit (e.g. each step needs the *remaining list* itself), or when
-reading older `.td` written before `!foldl` existed.
-
-### Conditionals — `!if` and `!cond`
-```tablegen
-class Sign<int n> {
-  // !if(test, then, else)
-  string S1 = !if(!lt(n, 0), "neg", "non-neg");
-
-  // !cond(c1: v1, c2: v2, ..., true: default)   -- evaluated in order
-  string S2 = !cond(!lt(n, 0): "negative",
-                    !eq(n, 0): "zero",
-                    true     : "positive");
-}
-
-def A : Sign<-5>;   // S1="neg",     S2="negative"
-def B : Sign<0>;    // S1="non-neg", S2="zero"
-def C : Sign<7>;    // S1="non-neg", S2="positive"
-```
-
-### List comprehension — `!foreach`, `!filter`, `!foldl`
-```tablegen
-def Comp {
-  list<int> Doubled = !foreach(x, [1,2,3,4], !mul(x, 2));   // [2,4,6,8]
-  list<int> Evens   = !filter(x, [1,2,3,4,5,6], !eq(!and(x,1), 0));  // [2,4,6]
-  int       Total   = !foldl(0, [1,2,3,4,5], acc, x, !add(acc, x)); // 15
+  int ret = !if(!empty(xs), 0, !add(!head(xs), Sum<!tail(xs)>.ret));
 }
 ```
 
-### Casting — `!cast`
-```tablegen
-class Marker;
-def  M : Marker;
+**Try it yourself.** The maximum of a list with `!foldl`; the odd numbers in
+`!range(10)` with `!filter`; weekday names for 0–6 with `!cond`.
 
-def Casting {
-  string  AsStr = !cast<string>(M);           // "M"      (record -> name)
-  int     I     = !cast<int>(0b1010);         // 10       (bits -> int)
-  // Looking up a record by name:
-  Marker  Ref   = !cast<Marker>("M");         // -> M
+## 5 — The paste operator `#`
+
+`#` concatenates strings or lists. It is the only infix operator, and it has
+one odd rule: **an undefined name, or the name of a global `defvar` or
+`defset`, is taken as verbatim text.**
+
+| Where | Left operand | Right operand |
+|---|---|---|
+| a `def`/`defm` name | global names verbatim | global names verbatim |
+| any other expression | evaluated | global names verbatim |
+
+```tablegen
+defvar suffix = "_suffstring";
+def name # suffix;                           // record "namesuffix"
+foreach i = [1, 2] in def rec # i;           // rec1, rec2: i is not global
+string Strings = suffix # suffix;            // "_suffstringsuffix"
+string Forced  = "x" # !cast<string>(suffix);   // "x_suffstring"
+string S       = n #;                        // trailing #: n as a string
+```
+
+Template arguments, fields and `foreach` variables are not global, so pasting
+them works as expected: `"x" # num` inside a class gives `"x5"`. When a global
+must be evaluated on the right, wrap it in a bang operator.
+
+**Try it yourself.** A class `GPR<int n>` with `AsmName = "x" # n`, and
+records `GPR0`..`GPR7` made in a `foreach`.
+
+## 6 — Classes and records
+
+A **class** is an abstract record. `def D : C` creates record `D` with all of
+`C`'s fields, and `let` in the body overrides a field. A record can also add
+fields of its own.
+
+```tablegen
+class Fruit { string Color = "unknown"; bit Edible = 1; }
+def Apple  : Fruit { let Color = "red"; }
+def Cherry : Fruit { let Color = "dark red"; int Pits = 1; }
+```
+
+The comment the printer puts after `def` lists every class the record
+inherits from, indirect ones first:
+
+```
+def Mango {	// Fruit Tropical
+```
+
+With **multiple inheritance**, the parents' fields are merged left to right,
+so when two parents define the same field the *last* one wins: `def AB : A,
+B` takes `B`'s `V`.
+
+The lesson also includes ProgRef's `ModRefBits` example, where one class
+reshapes another's data (a 2-bit `Value` becomes two named bits).
+
+**Try it yourself.** A class `Vehicle` with `int Wheels = 4; bit Motorized =
+1;` and records `Bicycle`, `Truck` and `Skateboard` that override it.
+
+## 7 — Template arguments
+
+```tablegen
+class Inst<int opc, string mnem = "?", bit hasSideFx = 0> { ... }
+def NOP : Inst<0x00>;                    // two defaults
+def DIV : Inst<opc=0x20, mnem="div">;    // named
+def MUL : Inst<0x21, hasSideFx=1>;       // positional, then named
+```
+
+- Arguments with a default are optional, and must come after the required
+  ones.
+- Positional arguments come before named ones, and no argument may be given
+  twice.
+- Every class has an implicit argument **`NAME`**, the name of the `def` or
+  `defm` that inherits it. It matters most in multiclasses (lesson 9).
+- A record can pass its own name to its parents: `def rec1 :
+  SelfRef<(ops rec1)>`.
+- An argument the class never reads gets a warning:
+  `warning: unused template argument: Unused:unused`.
+
+**Try it yourself.** A class `GPR<int n>` with `AsmName = "x" # n`, and
+records `X0`..`X3`.
+
+## 8 — `let`, and how records are built
+
+`let` overrides a field. In a record body it affects that record. At top
+level, `let ... in` affects every record defined in its scope, which is a
+braced block or a single statement; scopes nest.
+
+```tablegen
+let hasSideFx = 1 in {
+  def STORE : Inst;
+  let Latency = 8 in
+    def STORE8 : Inst;
 }
 ```
 
-> `!cast<T>("Name")` is a *late-bound lookup*: the record named "Name" must exist (eventually) and inherit from T.
+Details:
+- **Bit ranges.** The body form writes `let Opcode{7...4} = ...`; the
+  top-level form writes `let Opcode<7...4> = ... in`.
+- **The body wins.** Top-level bindings are applied right after inheritance,
+  so a body `let` overrides them: `let Latency = 2 in def MUL : Inst { let
+  Latency = 3; }` gives 3.
+- **Inherited fields only.** A top-level `let` must name an inherited field.
+  If the record defines the field itself, it is an *error*:
+  `error: Value 'Own' unknown!` (the example's `-DBAD_LET` run).
+- **No template arguments.** A `let` cannot set a template argument.
 
-### Type assertions — `!isa`, `!exists`, `!initialized`
+**How records are built** (ProgRef's order):
+
+1. Inherit the parent classes' fields and substitute their template
+   arguments.
+2. Apply top-level `let`s.
+3. Process the body: fields, `let`s, `defvar`s.
+4. Resolve references between fields.
+
+Step 4 comes last, so a `let` changes every field computed from the one it
+sets. Template arguments were substituted in step 1, so they do not change:
+
 ```tablegen
-class Animal;
-def  Dog : Animal;
+class C<int x> { int Y = x; int Yplus1 = !add(Y, 1); int xplus1 = !add(x, 1); }
+let Y = 10 in def rec1 : C<5>;     // Y = 10, Yplus1 = 11, xplus1 = 6
+```
 
-def Checks {
-  bit IsAn   = !isa<Animal>(Dog);           // 1
-  bit Exists = !exists<Animal>("Dog");      // 1
-  bit Init   = !initialized(?);             // 0
+There is no "let append". To grow a list along a class chain, pass the extra
+elements down as template arguments and `!listconcat` them; the lesson builds
+`["HasV1", "HasV2", "HasFP"]` this way.
+
+**Try it yourself.** Mark a group of instruction records as calls with one
+top-level `let`, and add a third level to the list chain.
+
+## 9 — `multiclass` and `defm`
+
+A **multiclass** is a macro that defines several records. **`defm`** invokes
+it. Inside the multiclass, `def _rr` means `def NAME # _rr`, so `defm ADD`
+produces `ADD_rr`:
+
+```tablegen
+multiclass ri_inst<int opc, string asmstr> {
+  def _rr : Inst<opc, ..., (ops GPR:$dst, GPR:$src1, GPR:$src2)>;
+  def _ri : Inst<opc, ..., (ops GPR:$dst, GPR:$src1, Imm:$src2)>;
 }
+defm ADD : ri_inst<0b111, "add">;      // ADD_rr, ADD_ri
 ```
 
-### Try it yourself
-- Use `!foldl` to compute the maximum of a list of ints.
-- Use `!filter` to extract odd numbers from `!range(0, 10)`.
-- Use `!cond` to map an integer 0–6 to weekday names.
+- A `defm` inside a multiclass is prefixed with `NAME` too. `basic_s` calls
+  `basic_r` twice, so `defm FADD : basic_s` gives `FADDSSrr`, `FADDSSrm`,
+  `FADDSDrr`, `FADDSDrm` and `FADDX`.
+- A `defm` lists one or more multiclasses, then any plain classes. The plain
+  classes' fields are added to every record it produces (`defm SS : R, XD`).
+- A multiclass can inherit other multiclasses (`multiclass LoadStore :
+  Loads`), and can contain `let`, `defvar`, `foreach`, `if` and `assert`.
+- `defm : M;` gives the records a unique generated name
+  (`anonymous_N_ld`), while `defm "" : M;` uses the multiclass's own names
+  as they are (`_ld`).
 
----
+**Try it yourself.** A multiclass `ShiftOps<int opc>` that produces `_l`,
+`_r` and `_ra`, invoked as `defm SH : ShiftOps<0x3>;`.
 
-## Lesson 7 — The Paste Operator `#`
+## 10 — `defvar`, `defset`, `deftype`
 
-`#` is the **only infix operator** in TableGen. It glues things together — strings, lists, or *identifier-like name fragments*.
+- **`defvar`** names a value. At top level it is a global; inside a class or
+  record body it is a local that does *not* become a field. It cannot be
+  reassigned. An inner `defvar` shadows an outer name from that point on, so
+  in `Shadow<3>`, `Before` is 3 and `After` is 7.
+- **`defset list<C> Name = { ... }`** defines the records inside as usual and
+  also collects them into a global list. A nested `defset` adds its records
+  to both lists. Anonymous records created by `C<...>` inside an expression
+  are not collected.
+- **`deftype byte = bits<8>;`** names a type. It is allowed at top level only,
+  and only for primitive types and other aliases.
 
-### Rule 1 — In a `def`/`defm` *name*, `#` builds a string
 ```tablegen
-foreach i = 0...3 in
-  def R#i;            // produces R0, R1, R2, R3
-```
-The right-hand side `i` is the **loop variable** (a real value here, `0` through `3`), and `#` concatenates it as text into the record name.
-
-### Rule 2 — In *other* expressions: LHS evaluated, RHS may be verbatim
-This is the trickiest part of TableGen syntax. If the RHS of `#` is:
-- a **defined** local value → it's evaluated normally;
-- an **undefined identifier** or a **global** name → it's used as a literal string.
-
-```tablegen
-defvar suffix = "_TAIL";
-
-def Demo {
-  // suffix is global -> taken VERBATIM as the string "suffix" on the RHS.
-  string A = "x" # suffix;        // "xsuffix"   (probably surprising!)
-
-  // To get the VALUE of suffix on the right, force normal evaluation:
-  string B = "x" # !cast<string>(suffix); // "x_TAIL"
-}
-```
-
-> **Rule of thumb:** when in doubt, wrap the right operand in a bang operator (`!cast<string>`, `!strconcat`, etc.) to force evaluation.
-
-### Rule 3 — Trailing `#` means "concat to empty string"
-```tablegen
-defvar n = 42;
-def D { string S = n#; }    // S = "42"
-```
-
-### Pasting lists
-```tablegen
-def L { list<int> X = [1,2,3] # [4,5]; }   // [1,2,3,4,5]
-```
-
-### Try it yourself
-1. Define a `class Reg<int n>` whose `string AsmName` is computed as `"x" # n`.
-2. Inside a `foreach i = 0...7`, generate `X0` through `X7`.
-
----
-
-## Lesson 8 — `multiclass` and `defm`
-
-A `multiclass` is a **macro that defines multiple records at once**. You define it with `multiclass` and *invoke* it with `defm`.
-
-### Why it exists
-Consider a 3-address ISA where every arithmetic op has both a `reg, reg, reg` form and a `reg, reg, imm` form. Without multiclasses you'd write twice as many `def`s. With a multiclass you write each pattern once.
-
-### Code
-```tablegen
-def GPR;
-def Imm;
-class Inst<int opc, string asm, dag operands> {
-  int Opcode = opc;
-  string Asm = asm;
-  dag Operands = operands;
-}
-
-multiclass ArithRI<int opc, string asm> {
-  def _rr : Inst<opc, !strconcat(asm, " $d, $s1, $s2"),
-                 (ops GPR:$d, GPR:$s1, GPR:$s2)>;
-  def _ri : Inst<opc, !strconcat(asm, " $d, $s1, $s2"),
-                 (ops GPR:$d, GPR:$s1, Imm:$s2)>;
-}
-
-defm ADD : ArithRI<0b111, "add">;
-defm SUB : ArithRI<0b101, "sub">;
-defm MUL : ArithRI<0b100, "mul">;
-```
-
-You'll need a stub class for `ops`; for an isolated demo just add `def ops;` at the top.
-
-### What records are produced
-```
-ADD_rr, ADD_ri
-SUB_rr, SUB_ri
-MUL_rr, MUL_ri
-```
-
-The trick: a `def Foo` *inside* a multiclass is equivalent to `def NAME # Foo`, where `NAME` becomes whatever the outer `defm` is named. So `defm ADD` + `def _rr` → `ADD_rr`.
-
-### Multiclasses can call other multiclasses
-```tablegen
-class Inst<int opc, string n> { int Opcode = opc; string Name = n; }
-
-multiclass Basic<int opc> {
-  def rr : Inst<opc, "rr">;
-  def rm : Inst<opc, "rm">;
-}
-
-multiclass Scalar<int opc> {
-  defm SS : Basic<opc>;       // -> NAME_SS_rr, NAME_SS_rm
-  defm SD : Basic<opc>;       // -> NAME_SD_rr, NAME_SD_rm
-  def  X  : Inst<opc, "x">;   // -> NAME_X
-}
-
-defm ADD : Scalar<0xF>;
-// Records: ADD_SS_rr, ADD_SS_rm, ADD_SD_rr, ADD_SD_rm, ADD_X
-```
-
-### Combining multiclasses in one `defm`
-You can inherit several multiclasses (and even regular classes after them) in a single `defm`:
-```tablegen
-class Predicated { bit IsPredicated = 1; }
-
-defm CMP : Scalar<0xA>, Predicated;
-// All five CMP records get IsPredicated = 1.
-```
-> A `defm`'s parent list must list all multiclasses **before** any plain classes.
-
-### Try it yourself
-- Write a multiclass `ShiftOps<int opc>` that produces three records: `_l` (left), `_r` (right logical), `_ra` (right arithmetic), all inheriting from your `Inst` class with the same opcode.
-- Invoke it with `defm SH : ShiftOps<0x3>;`.
-
----
-
-## Lesson 9 — `defvar`, `defset`, `deftype`
-
-### `defvar` — a named, immutable variable
-```tablegen
-defvar BaseOpc = 0x20;
-defvar Names   = ["add", "sub", "mul"];
-
-class Op<int idx> {
-  int Opc      = !add(BaseOpc, idx);
-  string Asm   = Names[idx];
-}
-
-def OP0 : Op<0>;       // Opc = 0x20, Asm = "add"
-def OP1 : Op<1>;       // Opc = 0x21, Asm = "sub"
-def OP2 : Op<2>;       // Opc = 0x22, Asm = "mul"
-```
-A `defvar` *cannot be reassigned* once defined. Inside a `foreach`, a `defvar` only lives for one iteration.
-
-### `defset` — collect records into a global list
-```tablegen
-class Reg<int n> { int Num = n; }
-
 defset list<Reg> AllRegs = {
   def R0 : Reg<0>;
-  def R1 : Reg<1>;
-  def R2 : Reg<2>;
+  defset list<Reg> ArgRegs = { def A0 : Reg<10>; def A1 : Reg<11>; }
 }
-
-// Now you can do:
-def Counter {
-  int NumRegs = !size(AllRegs);     // 3
-}
-```
-- Records inside the braces are still defined globally as usual.
-- They are *also* appended to the named list (`AllRegs` here).
-- Anonymous records produced by inline `ClassID<...>` are **not** added.
-
-### `deftype` — alias for a type
-```tablegen
-deftype byte = bits<8>;
-deftype halfword = bits<16>;
-
-def Insn { byte Opcode = 0xAB; halfword Imm = 0xBEEF; }
-```
-Only allowed at top level, and only for primitive types / aliases.
-
-### Try it yourself
-- Define a `defset list<Reg> Callee = { ... }` of callee-saved registers and another `defset list<Reg> Caller = { ... }` of caller-saved ones.
-- Use `!listconcat` and `!size` to produce a summary record.
-
----
-
-## Lesson 10 — Control Flow
-
-### `foreach`
-```tablegen
-class Reg<int n> { int Num = n; }
-
-foreach i = 0...7 in
-  def R#i : Reg<i>;
-// Produces R0..R7
-
-foreach name = ["sp", "lr", "pc"] in
-  def !toupper(name) : Reg<0>;
-// Hint: the iterator can be a list of any type.
-```
-Nested `foreach`:
-```tablegen
-foreach b = 0...1 in
-  foreach n = 0...3 in
-    def B#b#_R#n;
-// B0_R0, B0_R1, ... B1_R3
+// !size(AllRegs) = 3, !size(ArgRegs) = 2
 ```
 
-### `if ... then ... else`
-Works at top level, in record bodies, and in multiclasses.
-```tablegen
-class Reg<int n> {
-  int  Num   = n;
-  bit  IsLow = !lt(n, 16);
-}
+**Try it yourself.** Two `defset`s for callee- and caller-saved registers, and
+a summary record built with `!listconcat` and `!size`.
 
-foreach i = 0...31 in {
-  if !lt(i, 16) then
-    def R#i : Reg<i> { let IsLow = 1; }
-  else
-    def R#i : Reg<i> { let IsLow = 0; }
+## 11 — `foreach` and `if`
+
+Both repeat or select *statements* (`def`, `defm`, `let`, nested loops) at top
+level or in a multiclass. To compute a field's value inside a record, use
+`!foreach` and `!if`.
+
+```tablegen
+foreach i = 0...3 in def R # i : Reg<i>;          // a range
+foreach i = {8-9, 12} in def H # i : Reg<i>;      // a range list
+foreach name = ["sp", "lr"] in def !toupper(name) : Reg<0>;   // any list
+foreach i = !range(2) in {                        // a braced body
+  defvar sq = !mul(i, i);                         // lives for one iteration
+  def Sq # i : Reg<sq>;
 }
 ```
 
-### `assert`
-Checks an invariant. Non-fatal at top level / on record completion.
-```tablegen
-class Person<string name, int age> {
-  assert !le(!size(name), 32), "name too long: " # name;
-  assert !and(!ge(age, 0), !le(age, 130)), "bad age: " # age;
-  string Name = name;
-  int    Age  = age;
-}
+`if c then ... else ...` chooses statements; a dangling `else` binds to the
+nearest `if`. ProgRef says `if` can also appear inside a record body, but
+`llvm-tblgen` 20 rejects that (`Unknown token when expecting a type`).
 
-def Knuth : Person<"Donald Knuth", 86>;     // OK
-// def Bad : Person<"X", 999>;              // would print a note
+**Try it yourself.** Use `foreach` and `if` to make registers `X0`..`X31`, the
+first 8 with `IsArg = 1`.
+
+## 12 — `dump` and `assert`
+
+**`dump "msg";`** prints a note on stderr: at top level immediately, and in a
+class or multiclass each time something instantiates it. Pair it with `!repr`
+to inspect a value.
+
 ```
-- In a **class**: assertions are inherited and checked on each record.
-- In a **multiclass**: checked at each `defm` instantiation.
-
-### `dump` — debug print to stderr
-```tablegen
-multiclass MC<dag d> {
-  dump "received dag = " # !repr(d);
-  def : Inst<...>;
-}
-```
-Useful while iterating; remove before committing.
-
-### Try it yourself
-- Use `foreach` + `if` to generate 32 registers, where the first 8 have `IsArg = 1`, the rest `IsArg = 0`.
-- Add an `assert` that rejects names longer than 4 characters.
-
----
-
-## Lesson 11 — DAGs
-
-A `dag` value is a tree node with an **operator** and zero or more **arguments**, each of which can itself be a `dag`.
-
-### Syntax
-```
-(operator  arg1, arg2, ...)
-```
-Each `arg` can be:
-- `value` — just a value;
-- `value:$name` — value with a name tag;
-- `$name` — name only, value is `?`.
-
-The operator **must be a record**.
-
-### Code
-```tablegen
-def set;
-def add;
-def GR32;
-
-class Reg;
-def EAX : Reg;
-def EBX : Reg;
-
-def Pattern {
-  // (set EAX:$dst, (add EBX:$src1, 5))
-  dag P = (set EAX:$dst, (add EBX:$src1, 5));
-}
+12_dump_assert.td:19:3: note: MC got (op 1, 2)
 ```
 
-### DAG-manipulating bang operators
-| Operator | Effect |
+**`assert cond, "msg";`** reports an **error** when `cond` is false.
+`llvm-tblgen` finishes parsing and then exits with failure. When the check
+happens depends on where the `assert` is:
+
+| Where | Checked |
 |---|---|
-| `!getdagop(d)` | the operator record |
-| `!getdagarg<T>(d, k)` | argument by index or name |
-| `!getdagname(d, i)` | the `$name` of argument i |
-| `!setdagop(d, op)` | new DAG with operator replaced |
-| `!setdagarg(d, k, v)` | new DAG with argument k replaced |
-| `!setdagname(d, k, n)` | new DAG with name k replaced |
-| `!con(d1, d2, ...)` | concatenate DAGs (operators must match) |
-| `!dag(op, args, names)` | construct DAG from pieces |
-| `!size(d)` | number of arguments |
-| `!empty(d)` | 1 iff no arguments |
-| `!foreach(v, d, expr)` | map over arguments |
+| top level | immediately |
+| record | once the record is fully built |
+| class | on every record built from it (it is inherited) |
+| multiclass | on every `defm` |
 
-### Example
-```tablegen
-def op;
+Under `-DBAD` the example builds `Methuselah : Person<"Methuselah", 969>`:
 
-def Demo {
-  dag D1 = (op 1:$a, 2:$b);
-  dag D2 = (op 3:$c);
-  dag D3 = !con(D1, D2);     // (op 1:$a, 2:$b, 3:$c)
-  int N  = !size(D3);         // 3
-}
+```
+error: assertion failed: person age is invalid: 969
+error: assertion failed in this record
+def Methuselah : Person<"Methuselah", 969>;
 ```
 
-### Try it yourself
-- Build a DAG representing `(add r1, (mul r2, r3))` using suitable stub records.
-- Use `!getdagarg<int>` to extract a numbered argument.
+**Try it yourself.** Make a register class reject names longer than 4
+characters.
 
----
+## 13 — DAGs
 
-## Lesson 12 — Classes as Subroutines
+A `dag` is `(operator arg, ...)`. The operator must be a record. Each argument
+is a `value`, a `value:$name`, or a bare `$name` whose value is `?` (printed
+`?:$name`). Arguments can be dags, which makes a tree. LLVM uses dags for
+operand lists `(outs ...)`/`(ins ...)` and for instruction-selection patterns.
 
-Because `ClassName<args>` builds an *anonymous record* and you can immediately access its fields, classes work as ad-hoc **functions** that return multiple values.
-
-### Code
-```tablegen
-class IsPow2<int n> {
-  bit ret = !and(!ne(n, 0), !eq(!and(n, !sub(n, 1)), 0));
-}
-
-class IsValidSize<int sz> {
-  bit ret = !cond(!eq(sz,  1): 1,
-                  !eq(sz,  2): 1,
-                  !eq(sz,  4): 1,
-                  !eq(sz,  8): 1,
-                  !eq(sz, 16): 1,
-                  true        : 0);
-}
-
-def Data1 {
-  int Size = 8;
-  bit IsPow2     = IsPow2<Size>.ret;       // 1
-  bit IsValidSz  = IsValidSize<Size>.ret;  // 1
-}
-```
-
-You can return multiple "values" by having more than one named field:
-```tablegen
-class DivMod<int a, int b> {
-  int q = !div(a, b);
-  int r = !sub(a, !mul(!div(a, b), b));
-}
-
-def QR { int Q = DivMod<23, 5>.q; int R = DivMod<23, 5>.r; }   // Q=4, R=3
-```
-
-> Each call creates a fresh anonymous record. That's fine — they're cheap.
-
-### Try it yourself
-- Write a "subroutine" class `Clamp<int v, int lo, int hi>` whose `out` field is the clamped value.
-- Compose: write `ClampPow2<int v>` which clamps and then checks `IsPow2`.
-
----
-
-## Lesson 13 — Preprocessing
-
-TableGen ships with a tiny preprocessor — three directives only.
-
-| Directive | Purpose |
+| Operator | Result |
 |---|---|
-| `#define MACRO` | Define a macro (no value, just defined-ness). |
-| `#ifdef MACRO` | Compile-in if macro defined. |
-| `#ifndef MACRO` | Compile-in if macro *not* defined. |
-| `#else` | Else branch. |
-| `#endif` | Close the region. |
+| `!getdagop(d)`, `!getdagop<T>(d)` | the operator, optionally cast to class T |
+| `!getdagarg<T>(d, key)` | an argument by index or `$name`; `?` if not a T |
+| `!getdagname(d, i)` | the name of argument i |
+| `!setdagop(d, op)` | d with a new operator |
+| `!setdagarg(d, key, v)` | d with one argument replaced |
+| `!setdagname(d, key, n)` | d with one argument renamed |
+| `!con(d1, d2, ...)` | arguments concatenated; the operators must match |
+| `!dag(op, args, names)` | a dag built from lists |
+| `!size(d)`, `!empty(d)` | argument count; the operator is not counted |
+| `!foreach(x, d, expr)` | each argument mapped (x is typed as a dag) |
 
-### Code
 ```tablegen
-#define HAS_FP
-
-def Common { int X = 1; }
-
-#ifdef HAS_FP
-  def FloatUnit { string Name = "fpu"; }
-#else
-  def NoFPU { string Note = "no FPU"; }
-#endif
-
-#ifndef HAS_VECTOR
-  def Scalar;
-#endif
+dag Con = !con((add 1:$a, 2:$b), (add 3:$c));      // (add 1:$a, 2:$b, 3:$c)
+dag Map = !foreach(x, (add EAX:$a, EBX:$b), !subst(EBX, EAX, x));
+                                                   // (add EAX:$a, EAX:$b)
 ```
 
-### Defining macros from the command line
-```bash
-llvm-tblgen --print-records solution/13_preproc.td -DHAS_VECTOR
+**Try it yourself.** Build `(add r1, (mul r2, r3))`, then read its second
+argument back as a dag and get that dag's operator.
+
+## 14 — Classes as subroutines
+
+`ClassName<args>` used as a value creates an anonymous record, and a suffix
+reads one of its fields. That makes a class a function: the template
+arguments are the inputs, the fields the outputs. Several fields return
+several values.
+
+```tablegen
+class DivMod<int a, int b> { int q = !div(a, b); int r = !sub(a, !mul(q, b)); }
+def QR { int Q = DivMod<23, 5>.q; int R = DivMod<23, 5>.r; }    // 4, 3
 ```
 
-### Includes
+A class can call itself, which is how a loop with an unknown number of steps
+is written:
+
 ```tablegen
-include "Registers.td"
-include "Instructions.td"
+class Gcd<int a, int b> {
+  int ret = !if(!eq(b, 0), a, Gcd<b, !sub(a, !mul(!div(a, b), b))>.ret);
+}
 ```
-Lookup honors `-I <dir>` flags. The included file is lexically substituted.
 
----
+**Try it yourself.** `Clamp<v, lo, hi>`, then `ClampPow2<v>`, which clamps to
+[1, 16] and tests the result with `IsPow2`.
 
-## Lesson 14 — Capstone: A Mini Toy ISA
+## 15 — Preprocessing and `include`
 
-Let's combine everything into a small but realistic example: a 4-register, 8-instruction toy ISA called **MiniISA**.
+`include "file.td"` pastes a file in place, searching the `-I` directories.
+The preprocessor only does conditional compilation. A macro has no value: it
+is defined (by `#define` or `-D` on the command line) or it is not.
 
-### Code
-```tablegen
-//===-- 14_miniisa.td - A toy ISA description in TableGen ------*- tablegen -*-===//
+| Directive | Effect |
+|---|---|
+| `#define M` | define M |
+| `#ifdef M` / `#ifndef M` | start a region kept if M is / is not defined |
+| `#else`, `#endif` | the other branch; the end of the region |
 
-// ---------- 1. Registers ---------------------------------------------------
-class Register<string n, bits<2> num> {
-  string AsmName = n;
-  bits<2> Encoding = num;
-  bit CalleeSaved = 0;
-}
+Regions nest, and a region must end in the file it starts in. Macros defined
+before an `include` apply inside the included file
+([`Inputs/15_registers.td`](examples/Inputs/15_registers.td) tests `HAS_FP`).
+The example has two `RUN:` lines, with and without `-DHAS_VECTOR`, and checks
+which records each one produces.
 
-defset list<Register> AllRegs = {
-  def R0 : Register<"r0", 0b00>;
-  def R1 : Register<"r1", 0b01>;
-  def R2 : Register<"r2", 0b10> { let CalleeSaved = 1; }
-  def R3 : Register<"r3", 0b11> { let CalleeSaved = 1; }
-}
+Lessons 2, 8 and 12 use the same trick to keep an error case in the file
+next to the working code.
 
-// ---------- 2. Operand classes ---------------------------------------------
-class Operand;
-def REG  : Operand;
-def IMM  : Operand;
+**Try it yourself.** Make a record appear only when building with
+`-DDEBUG_INFO`.
 
-// ---------- 3. Instruction skeleton ----------------------------------------
-class Inst<bits<4> opc, string mnem, dag outs, dag ins> {
-  bits<4>     Opcode  = opc;
-  string      Mnemonic = mnem;
-  dag         OutOps  = outs;
-  dag         InOps   = ins;
-  list<string> Predicates = [];
-  bit         HasSideFx = 0;
-  bit         IsBranch  = 0;
-  bit         IsCall    = 0;
-}
+## 16 — Capstone: MiniISA
 
-def ops;     // placeholder operator for operand DAGs
+A toy ISA with 4 registers and 14 instructions, using most of the language
+at once:
+- `defset` collects the registers.
+- A multiclass gives each ALU operation register-register and
+  register-immediate forms.
+- A top-level `let` sets flags on a group of instructions.
+- `foreach` with `assert` validates the register names.
+- A `Summary` record computes facts with `!filter`, `!foreach` and
+  `!interleave`.
 
-// ---------- 4. A multiclass for RR / RI shape ------------------------------
-multiclass ArithOp<bits<4> opc, string mnem> {
-  def _rr : Inst<opc, mnem,
-                 (ops REG:$dst),
-                 (ops REG:$s1, REG:$s2)>;
-  def _ri : Inst<opc, mnem,
-                 (ops REG:$dst),
-                 (ops REG:$s1, IMM:$s2)>;
-}
-
-// ---------- 5. Define every arithmetic op in one block ---------------------
-let HasSideFx = 0 in {
-  defm ADD : ArithOp<0b0001, "add">;
-  defm SUB : ArithOp<0b0010, "sub">;
-  defm AND : ArithOp<0b0011, "and">;
-  defm OR  : ArithOp<0b0100, "or">;
-  defm XOR : ArithOp<0b0101, "xor">;
-}
-
-// ---------- 6. Memory + control flow ---------------------------------------
-def LOAD  : Inst<0b1000, "ld",  (ops REG:$dst), (ops REG:$addr)> { let HasSideFx = 1; }
-def STORE : Inst<0b1001, "st",  (ops),           (ops REG:$src, REG:$addr)> { let HasSideFx = 1; }
-def JMP   : Inst<0b1110, "jmp", (ops),           (ops IMM:$tgt)>  { let IsBranch = 1; }
-def CALL  : Inst<0b1111, "call",(ops),           (ops IMM:$tgt)>  { let IsCall   = 1; let IsBranch = 1; }
-
-// ---------- 7. A sanity assertion ------------------------------------------
-foreach R = AllRegs in
-  assert !le(!size(R.AsmName), 4), "register name too long: " # R.AsmName;
-
-// ---------- 8. A summary record using bang operators ------------------------
+```
 def Summary {
-  int    NumRegs        = !size(AllRegs);
-  int    NumCalleeSaved = !size(!filter(R, AllRegs, R.CalleeSaved));
-  string CalleeList     = !interleave(
-                            !foreach(R, !filter(R, AllRegs, R.CalleeSaved), R.AsmName),
-                            ", ");
+  int NumRegs = 4;
+  int NumCalleeSaved = 2;
+  string CalleeList = "r2, r3";
 }
 ```
 
-### Run it
-```bash
-llvm-tblgen --print-records solution/14_miniisa.td
-```
+The same ISA comes back twice in [`../backend`](../backend). `json/` turns
+these records into a C++ header. `stock/03_mini_target.td` rewrites the ISA
+against LLVM's `Target.td`, so that the real `--gen-register-info`,
+`--gen-instr-info`, `--gen-asm-writer`, `--gen-emitter` and
+`--gen-disassembler` backends accept it.
 
-Look at the `Summary` record in the output — `NumRegs=4`, `NumCalleeSaved=2`, `CalleeList="r2, r3"` — all computed at TableGen time.
+## 17 — Capstone: instruction encoding and `field`
 
-### What this exercises
-- Classes & inheritance (Lesson 2)
-- `bits<N>`, `dag`, `list` types (Lesson 3)
-- Template arguments (Lesson 4)
-- Top-level `let ... in` (Lesson 5)
-- Bang operators (Lesson 6)
-- `defm` + `multiclass` (Lesson 8)
-- `defset` (Lesson 9)
-- `foreach` + `assert` (Lesson 10)
-- DAGs (Lesson 11)
+This is the most common pattern in target descriptions. A fixed-width
+encoding word is assembled from bit ranges of operand fields:
 
----
-
-## Lesson 15 — Instruction Encoding & the `field` keyword
-
-This is the single most common pattern in real LLVM target descriptions, and the
-earlier lessons only hinted at it: building a fixed-width **encoding word** by
-assigning sub-ranges of a `bits<N>` field from other fields.
-
-### The `field` keyword
 ```tablegen
 class Inst<bits<6> opcode> {
-  field bits<32> Inst;        // the 32-bit machine encoding word
-  let Inst{31-26} = opcode;   // opcode in the top 6 bits
+  field bits<32> Inst;
+  let Inst{31-26} = opcode;
 }
-```
-`field` marks a member as part of the record's "interface" that a backend reads
-out. In modern TableGen it is **essentially optional** (`bits<32> Inst;` works
-too), but you will see it everywhere in `llvm/lib/Target/**/*.td`, traditionally
-documenting "a backend consumes this".
-
-### Filling in operand bits per-instruction
-A *class* can leave operand bits unset (`?`); subclasses and concrete records
-fill them in. See `solution/15_encoding.td` for the full R-type / I-type example:
-```tablegen
 class RType<bits<6> opcode, bits<6> funct> : Inst<opcode> {
   bits<5> rd; bits<5> rs; bits<5> rt; bits<5> shamt = 0;
-  let Inst{25-21} = rs;
-  let Inst{20-16} = rt;
-  let Inst{15-11} = rd;
-  let Inst{10-6}  = shamt;
-  let Inst{5-0}   = funct;
+  let Inst{25-21} = rs;  let Inst{20-16} = rt;  let Inst{15-11} = rd;
+  let Inst{10-6} = shamt;  let Inst{5-0} = funct;
 }
-
 def ADD : RType<0b000000, 0b100000> { let rd = 1; let rs = 2; let rt = 3; }
 ```
 
-### Run it
-```bash
-llvm-tblgen --print-records solution/15_encoding.td
-```
-In a *class* the unassigned operand positions print as `?`; in the concrete
-`def ADD` they resolve to a fully-determined 32-bit vector. This is exactly what
-`--gen-emitter` (machine-code emitter) and `--gen-disassembler` consume.
+In the class, `Inst` is a list of references (`rs{4}`, `RType:funct{0}`, …)
+to operand fields that are still `?`. In `ADD` they resolve to plain bits,
+0x00430820.
+
+`field` is a reserved word that ProgRef calls deprecated except for this use:
+it marks `Inst` as the encoding rather than an operand. With `llvm-tblgen` 20,
+`--gen-emitter` produces the same output with or without it. It does change
+`--dump-json`, which lists `field` members under `"!fields"`; the second
+`RUN:` line checks that with `jq`.
 
 ---
 
-## Appendix — Bang-Operator Cheat Sheet
+## Appendix — Bang operators in LLVM 20
 
-| Operator | Description |
-|---|---|
-| `!add`, `!sub`, `!mul`, `!div` | Arithmetic on ints. |
-| `!and`, `!or`, `!xor`, `!not` | Bitwise / logical. |
-| `!shl`, `!srl`, `!sra` | Shift left, shift right logical, shift right arithmetic. |
-| `!eq`, `!ne`, `!lt`, `!le`, `!gt`, `!ge` | Comparisons. |
-| `!if(c, a, b)` | Conditional expression. |
-| `!cond(c1:v1, c2:v2, ..., true:vd)` | Multi-way conditional. |
-| `!cast<T>(x)` | Type cast or record-by-name lookup. |
-| `!isa<T>(x)` | Type test. |
-| `!exists<T>(name)` | Does a record by that name & type exist? |
-| `!initialized(x)` | Is `x` not `?` ? |
-| `!size`, `!head`, `!tail`, `!empty` | List/string/DAG size & access. |
-| `!listconcat`, `!listflatten`, `!listsplat`, `!listremove`, `!range` | List construction. |
-| `!foreach(v, seq, expr)` | Map over a list or dag. |
-| `!filter(v, list, pred)` | Filter a list. |
-| `!foldl(init, list, acc, v, expr)` | Left fold. |
-| `!strconcat`, `!substr`, `!find`, `!interleave`, `!toupper`, `!tolower` | String ops. |
-| `!logtwo` | Integer floor log₂. |
-| `!repr` | Debug stringification. |
-| `!con`, `!dag`, `!getdagop`, `!getdagarg`, `!getdagname`, `!setdagop`, `!setdagarg`, `!setdagname`, `!getdagopname`, `!setdagopname` | DAG manipulation. |
-| `!match` | Regex match on strings. |
-| `!instances<T>([regex])` | Enumerate records of type T (with optional regex filter). |
-| `!subst(target, repl, value)` | Substitute target with repl in a string or record name. |
+All 51, plus `!cond`, from LLVM 20's Appendix A. The lesson column says where
+each is used.
 
----
+| Group | Operators | Lesson |
+|---|---|---|
+| Arithmetic | `!add` `!sub` `!mul` `!div` `!logtwo` | 4 |
+| Bitwise | `!and` `!or` `!xor` `!not` `!shl` `!srl` `!sra` | 4 |
+| Comparison | `!eq` `!ne` `!lt` `!le` `!gt` `!ge` | 4 |
+| Choice | `!if` `!cond` | 4 |
+| Strings | `!strconcat` `!substr` `!find` `!subst` `!toupper` `!tolower` `!interleave` | 4 |
+| Lists | `!listconcat` `!listflatten` `!listremove` `!listsplat` `!range` `!head` `!tail` | 4 |
+| Strings, lists, dags | `!size` `!empty` | 4, 13 |
+| Iteration | `!foreach` `!filter` `!foldl` | 4, 13 |
+| Types and records | `!cast` `!isa` `!exists` `!initialized` `!repr` | 4 |
+| DAGs | `!con` `!dag` `!getdagop` `!getdagarg` `!getdagname` `!setdagop` `!setdagarg` `!setdagname` | 13 |
 
-## Directory layout
-
-All 15 lesson files are reference **solutions** (the worked code plus the answers
-to the "try it yourself" exercises) and live flat in `solution/`, numbered
-`01`–`15` in reading order. The table groups them by theme — what each concept
-is *for*:
-
-| Theme | Lessons (files in `solution/`) |
-|---|---|
-| The core declarative model | 1 [`01_first.td`](solution/01_first.td), 2 [`02_class.td`](solution/02_class.td), 3 [`03_types.td`](solution/03_types.td), 4 [`04_template.td`](solution/04_template.td) |
-| Computing values & deriving records | 5 [`05_let.td`](solution/05_let.td) / [`05_exercise.td`](solution/05_exercise.td), 6 [`06_bang_op.td`](solution/06_bang_op.td), 7 [`07_paste.td`](solution/07_paste.td), 9 [`09_defvar_defset.td`](solution/09_defvar_defset.td), 12 [`12_subroutine.td`](solution/12_subroutine.td) |
-| Generating & composing many records | 8 [`08_multiclass.td`](solution/08_multiclass.td), 10 [`10_control_flow.td`](solution/10_control_flow.td), 11 [`11_dag.td`](solution/11_dag.td), 13 [`13_preproc.td`](solution/13_preproc.td) |
-| Producing real C++ output | 14 [`14_miniisa.td`](solution/14_miniisa.td), 15 [`15_encoding.td`](solution/15_encoding.td) |
-
-```
-language/
-├── solution/          # all 15 lesson .td files, flat (01-15)
-├── codegen-demo/      # C++ demo drivers for lessons 14-15 + CMakeLists.txt
-├── generated/         # td2cpp.py / backend output (git-ignored)
-├── gen-all.sh         # convert every solution/*.td -> generated/
-└── td2cpp.py          # generic .td -> C++ header converter (--dump-json)
-```
-
-## Generating C++ from the `.td` files
-
-A real TableGen *backend* walks the parsed records and emits C++. The stock
-backends (`--gen-instr-info`, `--gen-register-info`, …) only accept records that
-match a specific target's schema, so they can't consume the generic tutorial
-files. The one backend that works on *any* `.td` file is `--dump-json`, so the
-`td2cpp.py` converter drives that and turns the JSON into a plain C++ header:
-
-- each record → a `constexpr` struct instance,
-- fields (`bit`/`int`/`string`/`list`/`bits<N>`) → typed C++ members,
-- everything wrapped in a `namespace tdgen_<file>`.
-
-```bash
-./gen-all.sh                                  # every *.td -> generated/<name>.gen.h
-python3 td2cpp.py solution/11_dag.td   # or convert a single file
-```
-
-`td2cpp.py` is a schema-agnostic stand-in: it drives the one backend
-(`--dump-json`) that works on *any* records. To see a **real** LLVM backend
-pipeline — a `.td` consumed by a genuine `--gen-*` backend that emits a `.inc`
-you `#include` behind `GET_*` macros (linking `libLLVMSupport`) — see
-[`../backend`](../backend) Lesson 6 (`--gen-searchable-tables`).
-
-> `td2cpp.py` defaults to the Homebrew `llvm@20` path for `llvm-tblgen` — edit
-> the variable at the top if your install differs.
-
-### Building the C++ examples with CMake
-
-Lessons 14 and 15 each have a C++ consumer in `codegen-demo/`, and
-`codegen-demo/CMakeLists.txt` builds **both at once** — it runs `td2cpp.py`
-(reading the `.td` from `../solution/`) as part of the build, so there's no need
-to run `gen-all.sh` first:
-
-```bash
-cd codegen-demo
-cmake -S . -B build
-cmake --build build
-
-./build/miniisa_demo          # Lesson 14 — consumes 14_miniisa.gen.h   (td2cpp.py)
-./build/encoding_demo         # Lesson 15 — consumes 15_encoding.gen.h  (td2cpp.py)
-```
-
-Expected output:
-```
-# miniisa_demo
-MiniISA summary: 4 regs, 2 callee-saved (r2, r3)
-CALL  mnemonic=call isCall=1 isBranch=1
-...
-# encoding_demo
-ADD  (R-type) encoding = 0x00430820
-ADDI (I-type) encoding = 0x2041002a
-```
-
----
+`!getop` and `!setop` still parse but are deprecated in favour of `!getdagop`
+and `!setdagop`.
 
 ## Where to go next
 
-- **TableGen Backends** — `llvm/docs/TableGen/BackEnds.html` — what each official backend consumes.
-- **TableGen Backend Developer's Guide** — how to write your own backend that walks the records and emits text. The sibling [`../backend`](../backend) tutorial is a hands-on version (it also hosts the `--gen-searchable-tables` lesson).
-- **`llvm/lib/Target/<Target>/*.td`** — real-world examples (start with AArch64 or RISCV).
-
-> **Pro tip.** When something doesn't behave the way you expect, add a `dump !repr(...)` in a multiclass or `--print-detailed-records` on the command line. TableGen's metaprogramming surface is small but unusual, and printing the actual record state is almost always faster than reasoning about it.
-
-Happy TableGenning!
+- [`../README.md`](../README.md) runs the stock backends on the real X86
+  target, where every lesson above appears at scale.
+- [`../backend`](../backend) covers what consumes these records: the stock
+  `--gen-*` backends, a backend written as a script over `--dump-json`, and
+  backends written in C++.

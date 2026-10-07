@@ -1,0 +1,52 @@
+# REQUIRES: x86-td, jq
+#
+# The commands of README.md's X86 walkthrough, with their output. Run
+# ./fetch-x86.sh first; until then lit reports this test as UNSUPPORTED.
+#
+# DEFINE: %{tblgen} = llvm-tblgen -I %llvm_include -I %x86 %x86/X86.td
+#
+# --dump-json takes several seconds on X86, so it runs once.
+# RUN: %{tblgen} --dump-json -o %t.json
+
+# ---- Step 1: what is in there ------------------------------------------------
+# RUN: %{tblgen} --print-enums -class=Register | FileCheck --check-prefix=REGS %s
+# REGS: AH, AL, AX, BH, BL, BP, BPH, BPL, BX, CH, CL,
+#
+# RUN: jq '."!instanceof".Instruction | length' %t.json | FileCheck --check-prefix=NINST %s
+# NINST: {{^[0-9]{5}$}}
+
+# ---- Step 2: one record, fully expanded --------------------------------------
+# RUN: %{tblgen} | FileCheck --check-prefix=ADD32 %s
+# ADD32:      def ADD32rr { // InstructionEncoding Instruction X86Inst I NoCD8 ITy Sched BinOpRR DefEFLAGS NDD BinOpRR_RF OpSize32
+# ADD32:        string Namespace = "X86";
+# ADD32-NEXT:   dag OutOperandList = (outs GR32:$dst);
+# ADD32-NEXT:   dag InOperandList = (ins GR32:$src1, GR32:$src2);
+# ADD32-NEXT:   string AsmString = "add{l} {$src2, $src1|$src1, $src2}";
+# ADD32:        list<dag> Pattern = [(set GR32:$dst, EFLAGS, (X86add_flag GR32:$src1, GR32:$src2))];
+# ADD32:        list<Register> Defs = [EFLAGS];
+# ADD32:        bit isConvertibleToThreeAddress = 1;
+# ADD32-NEXT:   bit isCommutable = 1;
+#
+# RUN: jq '.ADD32rr | keys | map(select(startswith("!") | not)) | length' %t.json | FileCheck --check-prefix=NFIELDS %s
+# NFIELDS: 111
+
+# ---- Step 3: where it came from ----------------------------------------------
+# RUN: %{tblgen} --print-detailed-records | FileCheck --check-prefix=WHERE %s
+# WHERE:      ADD32rr  |X86InstrArithmetic.td:[[LOC:[0-9]+]]|
+# WHERE-NEXT:   Defm sequence: |X86InstrArithmetic.td:{{[0-9]+}}| |X86InstrArithmetic.td:[[LOC]]|
+# WHERE:          bit isCommutable = 1  |X86InstrArithmetic.td:{{[0-9]+}}|
+#
+# RUN: sed -n '/^multiclass ArithBinOp_RF</,/def 32rr /p' %x86/X86InstrArithmetic.td | FileCheck --check-prefix=SRC %s
+# SRC:      multiclass ArithBinOp_RF<bits<8> BaseOpc,
+# SRC:        let isCommutable = CommutableRR,
+# SRC:          let Predicates = [NoNDD] in {
+# SRC:            def 32rr : BinOpRR_RF<BaseOpc, mnemonic, Xi32, opnodeflag>, OpSize32;
+#
+# RUN: grep -A1 '^defm ADD : ArithBinOp_RF<' %x86/X86InstrArithmetic.td | FileCheck --check-prefix=INVOKE %s
+# INVOKE:      defm ADD : ArithBinOp_RF<0x01, 0x03, 0x05, "add", MRM0r, MRM0m,
+# INVOKE-NEXT:                          X86add_flag, add, 1, 1, 1>;
+#
+# "!locs" ends with the outermost defm, so this counts every record that the
+# `defm ADD` line made:
+# RUN: jq '(.ADD32rr["!locs"] | last) as $defm | [.[] | objects | select((."!locs"? // []) | last == $defm)] | length' %t.json | FileCheck --check-prefix=NADD %s
+# NADD: 156

@@ -1,0 +1,15 @@
+# RUN: %json_bin/miniisa_demo | FileCheck --check-prefix=MINI %s
+# RUN: %json_bin/encoding_demo | FileCheck --check-prefix=ENC %s
+# REQUIRES: json-build
+#
+# The two C++ programs compiled against td2cpp.py's headers (CMakeLists.txt).
+
+# MINI:      MiniISA summary: 4 regs, 2 callee-saved (r2, r3)
+# MINI-NEXT: 14 instructions, from ADD_ri to XOR_rr
+# MINI-NEXT: CALL  mnemonic=call isCall=1 isBranch=1
+# MINI-NEXT: LOAD  mnemonic=ld   hasSideFx=1
+# MINI-NEXT: R2    asm=r2 calleeSaved=1 encoding={0,1}
+
+# The same words lesson 17's CHECK lines show as bit lists.
+# ENC:      ADD  (R-type) encoding = 0x00430820
+# ENC-NEXT: ADDI (I-type) encoding = 0x2041002a

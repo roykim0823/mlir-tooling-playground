@@ -1,0 +1,18 @@
+# RUN: rm -rf %t && python3 %S/td2cpp.py --out-dir %t %S/../../language/examples/16_miniisa.td
+# RUN: FileCheck --input-file %t/16_miniisa.gen.h %s
+# REQUIRES: python3
+#
+# The Python backend on language lesson 16: every record becomes a struct and
+# a constexpr instance, and every class a list of its records' names.
+
+# CHECK:      namespace tdgen__16_miniisa {
+# CHECK:      struct R2_t {  // Register
+# CHECK-NEXT:   const char* AsmName;
+# CHECK-NEXT:   int64_t CalleeSaved;
+# CHECK-NEXT:   std::array<int64_t, 2> Encoding;
+# CHECK-NEXT: };
+# bits<2> 0b10 arrives least significant bit first.
+# CHECK-NEXT: constexpr R2_t R2 = { "r2", 1, {{[{][{]}} 0, 1 }} };
+# CHECK:      constexpr Summary_t Summary = { "r2, r3", 2, 4 };
+# CHECK:      constexpr std::array<const char*, 14> AllInst = {{[{][{]}} "ADD_ri", {{.*}}, "XOR_rr" }};
+# CHECK:      constexpr std::array<const char*, 4> AllRegister = {{[{][{]}} "R0", "R1", "R2", "R3" }};

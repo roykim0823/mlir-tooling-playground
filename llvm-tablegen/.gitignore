@@ -1,0 +1,5 @@
+# Fetched by fetch-x86.sh
+x86/
+# lit and CMake output
+.lit-out/
+build/

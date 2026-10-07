@@ -1,0 +1,48 @@
+# RUN: llvm-tblgen -I %llvm_include --gen-intrinsic-enums %llvm_include/llvm/IR/Intrinsics.td | FileCheck --check-prefix=INTRIN %s
+# RUN: llvm-tblgen -I %llvm_include --gen-vt %llvm_include/llvm/CodeGen/ValueTypes.td | FileCheck --check-prefix=VT %s
+# RUN: llvm-tblgen -I %llvm_include --gen-attrs %llvm_include/llvm/IR/Attributes.td | FileCheck --check-prefix=ATTR %s
+# RUN: llvm-tblgen -I %llvm_include --gen-directive-decl %llvm_include/llvm/Frontend/OpenMP/OMP.td | FileCheck --check-prefix=OMP %s
+#
+# Lesson 4 — Stock backends on LLVM's own .td files
+# BackEnds: "LLVM BackEnds" (Intrinsic, ...)
+#
+# An LLVM install ships the target-independent .td files under include/llvm,
+# so these backends run with nothing but llvm-tblgen. They also show the three
+# shapes a generated .inc file takes.
+
+# ---- Shape 1: blocks behind GET_ macros --------------------------------------
+# Define the macro, then #include the file, once per block you need.
+#   def int_abs : DefaultAttrsIntrinsic<[llvm_anyint_ty], ...>;   (Intrinsics.td)
+# INTRIN-LABEL: #ifdef GET_INTRINSIC_ENUM_VALUES
+# INTRIN:           abs = 1,  // llvm.abs
+# INTRIN:           num_intrinsics = {{[0-9]+}}
+# INTRIN-LABEL: #ifdef GET_INTRINSIC_ARGKIND
+
+# ---- Shape 2: an X-macro list ------------------------------------------------
+# One macro call per record; the includer defines the macro to expand each
+# call into whatever it needs: an enum entry, a table row, a switch case.
+#   def i32   : VTInt<32,  7>;
+#   def v4i32 : VTVec<4, i32, 60>;                               (ValueTypes.td)
+# VT-LABEL: #ifdef GET_VT_ATTR // (Ty, n, sz, Any, Int, FP, Vec, Sc, Tup, NF, NElem, EltTy)
+# VT:         GET_VT_ATTR(i32, 7, 32, 0, 3, 0, 0, 0, 0, 0, 0, INVALID_SIMPLE_VALUE_TYPE)
+# VT:         GET_VT_ATTR(v4i32, 60, 128, 0, 1, 0, 1, 0, 0, 0, 4, i32)
+#
+# Attributes.td supplies default definitions, so an includer can define only
+# the macros it cares about.
+#   def AlwaysInline : EnumAttr<"alwaysinline", ...>;           (Attributes.td)
+# ATTR-LABEL: #ifdef GET_ATTR_NAMES
+# ATTR:       #ifndef ATTRIBUTE_ENUM
+# ATTR-NEXT:  #define ATTRIBUTE_ENUM(FIRST, SECOND) ATTRIBUTE_ALL(FIRST, SECOND)
+# ATTR:       ATTRIBUTE_ENUM(AlwaysInline,alwaysinline)
+# ATTR:       ATTRIBUTE_ENUM(NoUnwind,nounwind)
+
+# ---- Shape 3: a complete header ----------------------------------------------
+# Include guard, includes and namespaces: an ordinary header, included once.
+#   def OMP_Parallel : Directive<"parallel"> { ... }                     (OMP.td)
+# OMP:       #ifndef LLVM_OpenMP_INC
+# OMP-NEXT:  #define LLVM_OpenMP_INC
+# OMP:       namespace llvm {
+# OMP:       namespace omp {
+# OMP:       enum class Directive {
+# OMP:         OMPD_parallel,
+# OMP:       static constexpr std::size_t Directive_enumSize = {{[0-9]+}};
